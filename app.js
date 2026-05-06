@@ -45,6 +45,8 @@ let activeCategoryDominanceType = 'athlete';
 let expandedRelayResults = new Set();
 let promoPopupTimer = null;
 let rankingViews = null;
+let sessionRankingData = null;
+let activeSessionRankingKey = '';
 let styleDominanceData = null;
 let categoryDominanceData = null;
 
@@ -869,6 +871,131 @@ function getScoringIndividualRows(rows) {
     && !row.ns
     && !row.nt
   ));
+}
+
+function buildSessionRankingData(rows) {
+  const sessions = new Map();
+
+  getScoringIndividualRows(rows).forEach((row) => {
+    const sessionKey = row.sesionNombre;
+    const athleteKey = normalizeAthleteName(row.nombre);
+    if (!sessionKey || !athleteKey) return;
+
+    if (!sessions.has(sessionKey)) {
+      sessions.set(sessionKey, {
+        key: sessionKey,
+        label: getSessionPillLabel(sessionKey),
+        order: row.sesion || 999,
+        athletes: new Map(),
+        totalPoints: 0,
+        totalEvents: 0
+      });
+    }
+
+    const session = sessions.get(sessionKey);
+    if (!session.athletes.has(athleteKey)) {
+      session.athletes.set(athleteKey, {
+        nombre: row.nombre,
+        teamName: row.categoria,
+        genero: row.genero,
+        points: 0,
+        events: 0,
+        wins: 0,
+        tests: new Set()
+      });
+    }
+
+    const athlete = session.athletes.get(athleteKey);
+    const points = Number(row.puntosOficiales || row.puntos || 0);
+    if (!isRealCategory(athlete.teamName) && isRealCategory(row.categoria)) {
+      athlete.teamName = row.categoria;
+    }
+    athlete.points += points;
+    athlete.events += 1;
+    athlete.tests.add(row.prueba);
+    if (row.pos === 1) athlete.wins += 1;
+    session.totalPoints += points;
+    session.totalEvents += 1;
+    session.order = Math.min(session.order, row.sesion || 999);
+  });
+
+  return [...sessions.values()]
+    .sort((a, b) => a.order - b.order || a.label.localeCompare(b.label, 'es'))
+    .map((session) => {
+      const entries = rankByValue(
+        [...session.athletes.values()].map((athlete) => ({
+          ...athlete,
+          points: Number(cleanPoints(athlete.points)),
+          testsCount: athlete.tests.size
+        })),
+        'points'
+      );
+
+      return {
+        ...session,
+        entries,
+        winner: entries[0] || null,
+        totalPoints: Number(cleanPoints(session.totalPoints))
+      };
+    });
+}
+
+function renderSessionRanking() {
+  const switchEl = document.getElementById('sessionRankingSwitch');
+  const winnerEl = document.getElementById('sessionWinnerCard');
+  const listEl = document.getElementById('sessionRankingList');
+  if (!switchEl || !winnerEl || !listEl || !sessionRankingData?.length) return;
+
+  if (!activeSessionRankingKey || !sessionRankingData.some((session) => session.key === activeSessionRankingKey)) {
+    activeSessionRankingKey = sessionRankingData[0].key;
+  }
+
+  switchEl.innerHTML = sessionRankingData.map((session) => `
+    <button
+      class="ranking-switch-btn session-ranking-btn${session.key === activeSessionRankingKey ? ' active' : ''}"
+      data-session-ranking="${session.key}"
+      type="button"
+    >
+      ${session.label}
+    </button>
+  `).join('');
+
+  const activeSession = sessionRankingData.find((session) => session.key === activeSessionRankingKey);
+  const winner = activeSession?.winner;
+
+  winnerEl.innerHTML = winner ? `
+    <div>
+      <span class="metric-label">Ganador de ${activeSession.label}</span>
+      <strong class="session-winner-name">${getAthleteAction(winner.nombre)}</strong>
+      <span class="metric-copy">${getDisplayGroup(winner.teamName)} · ${cleanPoints(winner.points)} pts · ${winner.events} prueba${winner.events !== 1 ? 's' : ''}</span>
+    </div>
+    <div class="session-winner-score">
+      <span>${cleanPoints(winner.points)}</span>
+      <small>pts</small>
+    </div>
+  ` : '<div class="metrics-note">No hay datos puntuables para esta fecha.</div>';
+
+  const topRows = activeSession.entries.slice(0, 15);
+  listEl.innerHTML = topRows.length ? topRows.map((entry, index) => `
+    <div class="ranking-row session-ranking-row ${index === 0 ? 'rk-gold' : index === 1 ? 'rk-silver' : index === 2 ? 'rk-bronze' : ''}">
+      <div class="rk-pos">${entry.rank}</div>
+      <div class="rk-body">
+        <div class="rk-name">${getAthleteAction(entry.nombre)}</div>
+        <div class="rk-events">${getDisplayGroup(entry.teamName)} · ${entry.events} prueba${entry.events !== 1 ? 's' : ''} · ${entry.wins} victoria${entry.wins !== 1 ? 's' : ''}</div>
+      </div>
+      <div class="rk-points">
+        <span class="rk-pts">${cleanPoints(entry.points)}</span>
+        <span class="rk-pts-label">pts</span>
+      </div>
+    </div>
+  `).join('') : '<div class="metrics-note">No hay datos puntuables para esta fecha.</div>';
+
+  switchEl.querySelectorAll('[data-session-ranking]').forEach((button) => {
+    button.addEventListener('click', () => {
+      activeSessionRankingKey = button.dataset.sessionRanking;
+      renderSessionRanking();
+    });
+  });
 }
 
 function rankByValue(items, valueKey, labelKey = 'nombre') {
@@ -2015,6 +2142,7 @@ function init() {
     },
     athlete: buildAthleteRankingData(allData)
   };
+  sessionRankingData = buildSessionRankingData(allData);
 
   renderStats(allData);
   renderDatasetCopy(allData);
@@ -2025,6 +2153,7 @@ function init() {
   renderResults();
   updateResultsInfo();
   syncRankingView(allData.length);
+  renderSessionRanking();
   renderMedallero(allData);
   renderMetrics(allData);
   initRankingSwitch();
