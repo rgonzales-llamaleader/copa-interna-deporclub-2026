@@ -1,8 +1,8 @@
 const RECORDS = {
     "meta":  {
-                 "nombre":  "I Fecha Torneo Interno Deporclub 2026",
-                 "fechas":  "Clausura 2025",
-                 "sesion":  "Resultados importados desde CLAUSURA 2025.xlsx",
+                 "nombre":  "Fecha 1 Torneo Interno Deporclub 2026",
+                 "fechas":  "Apertura 2026",
+                 "sesion":  "Resultados importados desde APERTURA 2026.xlsx",
                  "sesiones":  5,
                  "eventos":  90,
                  "categorias":  16,
@@ -8548,7 +8548,7 @@ const RECORDS = {
                           },
     "validacion":  {
                        "provisional":  false,
-                       "source":  "CLAUSURA 2025.xlsx",
+                       "source":  "APERTURA 2026.xlsx",
                        "officialScope":  "imported-results",
                        "officialUntilEvent":  90,
                        "totals":  {
