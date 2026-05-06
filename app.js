@@ -36,12 +36,12 @@ let activePodioSesion = 'all';
 let activePodioGenero = 'all';
 let activeMedalBuscar = '';
 let activeMedalleroType = 'all';
-let activeRankingType = 'team';
-let activeStyleDominanceType = 'team';
+let activeRankingType = 'athlete';
+let activeStyleDominanceType = 'athlete';
 let activeStyleDominanceFilter = '';
 let activeCategoryDominanceScope = 'combined';
 let activeCategoryDominanceFilter = '';
-let activeCategoryDominanceType = 'team';
+let activeCategoryDominanceType = 'athlete';
 let expandedRelayResults = new Set();
 let promoPopupTimer = null;
 let rankingViews = null;
@@ -54,25 +54,52 @@ const PROMO_POPUP_STORAGE_KEY = 'deporclubPromoPopupLastShownAt';
 const INDIVIDUAL_POINTS_SCALE = [9, 7, 6, 5, 4, 3, 2, 1];
 const RELAY_POINTS_SCALE = [18, 14, 12, 10, 8, 6, 4, 2];
 const MINOR_SIMULATION_SESSIONS = new Set([4, 6]);
-const SESSION_PILL_LABELS = {
-  'Primera Sesion': '25 marzo',
-  'Segunda Sesion': '26 marzo',
-  'Tercera Fecha': '27 marzo',
-  'Tercera Sesion': '27 marzo',
-  'Cuarta Sesion': '28 marzo',
-  'Quinta Sesion': '28 marzo',
-  'Sexta Sesion': '29 marzo'
-};
-
 function getSessionPillLabel(sessionName) {
-  return SESSION_PILL_LABELS[sessionName] || sessionName;
+  return sessionName;
+}
+
+function getDisplayGroup(value) {
+  return value === 'Absoluto' ? 'Todos' : value;
+}
+
+function isRealCategory(value) {
+  return value && value !== 'Absoluto';
+}
+
+function getPrimaryCategory(rows) {
+  const counts = new Map();
+  rows
+    .filter((row) => !row.relay && isRealCategory(row.categoria))
+    .forEach((row) => counts.set(row.categoria, (counts.get(row.categoria) || 0) + 1));
+
+  const preferred = [...counts.entries()]
+    .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0], 'es'))[0]?.[0];
+
+  return preferred || rows.find((row) => row.categoria)?.categoria || '';
+}
+
+function getDisplayCategoryForRow(row) {
+  if (!row || row.relay || isRealCategory(row.categoria)) return row?.categoria || '';
+  const athleteKey = normalizeAthleteName(row.nombre);
+  const matchingRows = allData.filter((item) => (
+    !item.relay
+    && normalizeAthleteName(item.nombre) === athleteKey
+    && isRealCategory(item.categoria)
+  ));
+  const matchingSameRace = matchingRows.find((item) => (
+    item.prueba === row.prueba
+    && item.tiempo === row.tiempo
+    && item.sesionNombre === row.sesionNombre
+  ));
+  return matchingSameRace?.categoria || getPrimaryCategory(matchingRows) || row.categoria;
 }
 
 const isDesktop = () => window.innerWidth >= 768;
 
 function syncBodyScrollLock() {
   const hasOpenOverlay = document.getElementById('filterSheet')?.classList.contains('open')
-    || document.getElementById('promoPopup')?.classList.contains('open');
+    || document.getElementById('promoPopup')?.classList.contains('open')
+    || document.getElementById('athleteDetailModal')?.classList.contains('open');
   document.body.style.overflow = hasOpenOverlay ? 'hidden' : '';
 }
 
@@ -114,6 +141,10 @@ function getResultSecondaryMeta(row) {
   return `Relevo ${row.relayLabel} Â· ${row.integrantes.map((item) => item.nombre).join(' / ')}`;
 }
 
+function getAthleteAction(name, label = name) {
+  return `<button class="athlete-link" type="button" data-athlete-name="${name}">${label}</button>`;
+}
+
 function getRelayResultKey(row) {
   return `${row.id}|${row.evento}|${row.equipo}|${row.relayLabel || ''}`;
 }
@@ -125,7 +156,7 @@ function populateSelect(id, values, allLabel) {
   [...values].sort((a, b) => String(a).localeCompare(String(b), 'es')).forEach((value) => {
     const opt = document.createElement('option');
     opt.value = value;
-    opt.textContent = value;
+    opt.textContent = id === 'filterEquipo' ? getDisplayGroup(value) : value;
     el.appendChild(opt);
   });
   el.value = current;
@@ -162,7 +193,6 @@ function renderStats(data) {
       .filter(Boolean)
   ).size;
   document.getElementById('statAtletas').textContent = atletasUnicos;
-  document.getElementById('statEquipos').textContent = new Set(data.map((r) => r.equipo)).size;
   document.getElementById('statCategorias').textContent = RECORDS.meta.categorias;
   document.getElementById('statPruebas').textContent = RECORDS.meta.eventos;
   document.getElementById('headerSub').textContent = `${RECORDS.meta.fechas} · ${RECORDS.meta.sesion}`;
@@ -174,7 +204,7 @@ function renderDatasetCopy(data) {
   updateRankingCopy(data.length);
 
   if (medalleroSubtitle) {
-    medalleroSubtitle.textContent = `Medallas acumuladas por persona y equipo hasta el Evento ${RECORDS.meta.eventos}`;
+    medalleroSubtitle.textContent = `Medallas acumuladas por persona hasta el Evento ${RECORDS.meta.eventos}`;
   }
 }
 
@@ -185,23 +215,15 @@ function updateRankingCopy(processedRows = allData.length) {
 
   if (!rankingSubtitle) return;
 
-  rankingSubtitle.textContent = activeRankingType === 'team'
-    ? `${corte} por equipos hasta el Evento ${officialUntilEvent} · ${processedRows} resultados procesados`
-    : `${corte} por personas hasta el Evento ${officialUntilEvent} · las postas no suman puntos individuales`;
+  rankingSubtitle.textContent = `${corte} por personas hasta el Evento ${officialUntilEvent} · ${processedRows} resultados procesados · las postas no suman puntos individuales`;
 }
 
 function updateRankingHeadings() {
-  const labels = activeRankingType === 'team'
-    ? {
-        combined: 'Acumulado general por equipos',
-        women: 'Acumulado mujeres por equipos',
-        men: 'Acumulado hombres por equipos'
-      }
-    : {
-        combined: 'Acumulado general por personas',
-        women: 'Acumulado mujeres por personas',
-        men: 'Acumulado hombres por personas'
-      };
+  const labels = {
+    combined: 'Acumulado general por personas',
+    women: 'Acumulado mujeres por personas',
+    men: 'Acumulado hombres por personas'
+  };
 
   document.getElementById('rankingHeadingCombined').textContent = labels.combined;
   document.getElementById('rankingHeadingWomen').textContent = labels.women;
@@ -444,8 +466,8 @@ function renderPodios(data, sessionFilter = 'all', genderFilter = 'all') {
               <div class="podio-place p${index + 1}${breakerClass}">
                 <span class="medal-icon">${['🥇', '🥈', '🥉'][index]}</span>
                 <div class="place-body">
-                  <div class="place-name">${row.nombre}${badge ? ` <span class="record-pill ${badge.toLowerCase()}">${badgeLabel}</span>` : ''}</div>
-                  <div class="place-meta"><span class="equipo-tag">${row.equipo}</span> · ${getPodioMeta(row)}</div>
+                  <div class="place-name">${row.relay ? row.nombre : getAthleteAction(row.nombre)}${badge ? ` <span class="record-pill ${badge.toLowerCase()}">${badgeLabel}</span>` : ''}</div>
+                  <div class="place-meta"><span class="equipo-tag">${getDisplayCategoryForRow(row)}</span> · ${getPodioMeta(row)}</div>
                 </div>
                 <span class="place-time${badge ? ' record-time' : ''}">${row.displayTime}</span>
               </div>
@@ -524,12 +546,12 @@ function renderResults() {
     const recordBadge = getRecordBadge(row);
     const isRelayExpanded = row.relay && expandedRelayResults.has(getRelayResultKey(row));
     const relayToggle = row.relay
-      ? `<button class="equipo-tag equipo-tag-btn" type="button" data-relay-toggle="${getRelayResultKey(row)}">${row.equipo}</button>`
-      : `<span class="equipo-tag">${row.equipo}</span>`;
+      ? `<button class="equipo-tag equipo-tag-btn" type="button" data-relay-toggle="${getRelayResultKey(row)}">${getDisplayCategoryForRow(row)}</button>`
+      : `<span class="equipo-tag">${getDisplayCategoryForRow(row)}</span>`;
     const relayMembers = row.relay && Array.isArray(row.integrantes) && row.integrantes.length
       ? `
         <div class="rc-relay-members${isRelayExpanded ? ' open' : ''}">
-          <div class="rc-relay-title">Integrantes del equipo</div>
+          <div class="rc-relay-title">Integrantes del relevo</div>
           <div class="rc-relay-list">
             ${row.integrantes.map((item) => `
               <div class="rc-relay-member">
@@ -545,9 +567,9 @@ function renderResults() {
     card.innerHTML = `
       <div class="rc-pos ${posClass}">${posLabel}</div>
       <div class="rc-body">
-        <div class="rc-name">${row.nombre}${statusTag(row)}</div>
+        <div class="rc-name">${row.relay ? row.nombre : getAthleteAction(row.nombre)}${statusTag(row)}</div>
         <div class="rc-meta">
-          ${relayToggle} · Evento ${row.evento} · ${row.prueba} · ${row.categoria}
+          ${relayToggle} · Evento ${row.evento} · ${row.prueba} · ${getDisplayCategoryForRow(row)}
         </div>
         <div class="rc-submeta">${getResultSecondaryMeta(row)}</div>
         ${relayMembers}
@@ -632,9 +654,9 @@ function renderRankingList(targetId, rows, mode = 'team') {
   rows.forEach((entry, index) => {
     const wrapper = document.createElement('div');
     wrapper.className = `ranking-row ${index === 0 ? 'rk-gold' : index === 1 ? 'rk-silver' : index === 2 ? 'rk-bronze' : ''}`;
-    const title = mode === 'team' ? entry.teamName : entry.nombre;
+    const title = mode === 'team' ? getDisplayGroup(entry.teamName) : getAthleteAction(entry.nombre);
     const meta = mode === 'athlete' && entry.teamName
-      ? `<div class="rk-events">${entry.teamName}</div>`
+      ? `<div class="rk-events">${getDisplayGroup(entry.teamName)}</div>`
       : '';
     wrapper.innerHTML = `
       <div class="rk-pos">${index < 3 ? ['&#129351;', '&#129352;', '&#129353;'][index] : entry.rank}</div>
@@ -675,10 +697,14 @@ function buildAthleteRankingData(rows) {
   };
 
   const ensureAthlete = (scope, nombre, teamName) => {
-    if (!buckets[scope].has(nombre)) {
-      buckets[scope].set(nombre, { nombre, teamName, points: 0 });
+    const key = normalizeAthleteName(nombre);
+    if (!buckets[scope].has(key)) {
+      buckets[scope].set(key, { nombre, teamName, points: 0 });
     }
-    return buckets[scope].get(nombre);
+    if (!isRealCategory(buckets[scope].get(key).teamName) && isRealCategory(teamName)) {
+      buckets[scope].get(key).teamName = teamName;
+    }
+    return buckets[scope].get(key);
   };
 
   rows
@@ -693,9 +719,9 @@ function buildAthleteRankingData(rows) {
     ))
     .forEach((row) => {
       const points = Number(row.puntosOficiales || row.puntos || 0);
-      ensureAthlete('combined', row.nombre, row.teamName).points += points;
-      if (row.genero === 'Damas') ensureAthlete('women', row.nombre, row.teamName).points += points;
-      if (row.genero === 'Varones') ensureAthlete('men', row.nombre, row.teamName).points += points;
+      ensureAthlete('combined', row.nombre, row.categoria).points += points;
+      if (row.genero === 'Damas') ensureAthlete('women', row.nombre, row.categoria).points += points;
+      if (row.genero === 'Varones') ensureAthlete('men', row.nombre, row.categoria).points += points;
     });
 
   const rankEntries = (items) => {
@@ -834,49 +860,313 @@ function renderSimulationRanking(targetId, rows) {
   });
 }
 
-function renderMetrics(rows) {
-  const simulation = buildMinorPointsSimulation(rows);
-  const summary = simulation.summary;
-  const summaryContainer = document.getElementById('metricsSummary');
-  const note = document.getElementById('metricsNote');
+function getScoringIndividualRows(rows) {
+  return rows.filter((row) => (
+    !row.relay
+    && Number(row.puntosOficiales || row.puntos || 0) > 0
+    && !row.exhibition
+    && !row.dq
+    && !row.ns
+    && !row.nt
+  ));
+}
 
-  summaryContainer.innerHTML = `
+function rankByValue(items, valueKey, labelKey = 'nombre') {
+  const sorted = [...items].sort((a, b) => (
+    b[valueKey] - a[valueKey]
+    || String(a[labelKey]).localeCompare(String(b[labelKey]), 'es')
+  ));
+
+  let lastValue = null;
+  let lastRank = 0;
+  return sorted.map((item, index) => {
+    const rank = item[valueKey] === lastValue ? lastRank : index + 1;
+    lastValue = item[valueKey];
+    lastRank = rank;
+    return { rank, ...item };
+  });
+}
+
+function buildIndividualAnalysisData(rows) {
+  const athletes = new Map();
+  const improvementCandidates = new Map();
+
+  getScoringIndividualRows(rows).forEach((row) => {
+    const key = normalizeAthleteName(row.nombre);
+    if (!key) return;
+
+    if (!athletes.has(key)) {
+      athletes.set(key, {
+        nombre: row.nombre,
+        teamName: row.categoria,
+        genero: row.genero,
+        points: 0,
+        events: 0,
+        tests: new Set(),
+        firstPoints: 0,
+        fifthPoints: 0,
+        sessions: new Map()
+      });
+    }
+
+    const athlete = athletes.get(key);
+    if (!isRealCategory(athlete.teamName) && isRealCategory(row.categoria)) {
+      athlete.teamName = row.categoria;
+    }
+    const points = Number(row.puntosOficiales || row.puntos || 0);
+    athlete.points += points;
+    athlete.events += 1;
+    athlete.tests.add(row.prueba);
+    athlete.sessions.set(row.sesionNombre, (athlete.sessions.get(row.sesionNombre) || 0) + points);
+
+    if (row.sesionNombre === 'Primera Fecha') athlete.firstPoints += points;
+    if (row.sesionNombre === 'Quinta Fecha') athlete.fifthPoints += points;
+
+    const time = timeToSec(row.tiempo);
+    if (Number.isFinite(time) && ['Primera Fecha', 'Quinta Fecha'].includes(row.sesionNombre)) {
+      const comparisonKey = `${key}|${row.prueba}`;
+      if (!improvementCandidates.has(comparisonKey)) {
+        improvementCandidates.set(comparisonKey, {
+          athleteKey: key,
+          nombre: row.nombre,
+          teamName: row.categoria,
+          prueba: row.prueba,
+          firstTime: Infinity,
+          fifthTime: Infinity,
+          firstDisplay: '',
+          fifthDisplay: ''
+        });
+      }
+      const comparison = improvementCandidates.get(comparisonKey);
+      if (row.sesionNombre === 'Primera Fecha' && time < comparison.firstTime) {
+        comparison.firstTime = time;
+        comparison.firstDisplay = row.displayTime;
+      }
+      if (row.sesionNombre === 'Quinta Fecha' && time < comparison.fifthTime) {
+        comparison.fifthTime = time;
+        comparison.fifthDisplay = row.displayTime;
+      }
+    }
+  });
+
+  const bestImprovementByAthlete = new Map();
+  [...improvementCandidates.values()]
+    .filter((item) => Number.isFinite(item.firstTime) && Number.isFinite(item.fifthTime) && item.fifthTime < item.firstTime)
+    .forEach((item) => {
+      const improvementPct = Number(cleanPoints(((item.firstTime - item.fifthTime) / item.firstTime) * 100));
+      const enriched = {
+        ...item,
+        improvementPct,
+        secondsImproved: Number(cleanPoints(item.firstTime - item.fifthTime))
+      };
+      const current = bestImprovementByAthlete.get(item.athleteKey);
+      if (!current || enriched.improvementPct > current.improvementPct) {
+        bestImprovementByAthlete.set(item.athleteKey, enriched);
+      }
+    });
+
+  const entries = [...athletes.values()].map((athlete) => ({
+    ...athlete,
+    points: Number(cleanPoints(athlete.points)),
+    pointsPerEvent: Number(cleanPoints(athlete.events ? athlete.points / athlete.events : 0)),
+    testsCount: athlete.tests.size,
+    firstPoints: Number(cleanPoints(athlete.firstPoints)),
+    fifthPoints: Number(cleanPoints(athlete.fifthPoints)),
+    improvement: bestImprovementByAthlete.get(normalizeAthleteName(athlete.nombre)) || null
+  }));
+
+  const totalRanking = rankByValue(entries, 'points');
+  const efficiencyRanking = rankByValue(entries.filter((entry) => entry.events > 0), 'pointsPerEvent');
+  const improvementRanking = rankByValue(
+    entries
+      .filter((entry) => entry.improvement)
+      .map((entry) => ({ ...entry, improvementPct: entry.improvement.improvementPct })),
+    'improvementPct'
+  );
+  const topTotal = totalRanking[0] || null;
+  const topEfficiency = efficiencyRanking[0] || null;
+  const topImprovement = improvementRanking[0] || null;
+
+  return {
+    entries,
+    totalRanking,
+    efficiencyRanking,
+    improvementRanking,
+    summary: {
+      athletes: entries.length,
+      totalEvents: entries.reduce((sum, entry) => sum + entry.events, 0),
+      topTotal,
+      topEfficiency,
+      topImprovement
+    }
+  };
+}
+
+function renderIndividualRankingList(targetId, rows, metric) {
+  const list = document.getElementById(targetId);
+  if (!list) return;
+
+  const topRows = rows.slice(0, 15);
+  list.innerHTML = topRows.length ? topRows.map((entry, index) => {
+    const value = metric === 'efficiency'
+      ? cleanPoints(entry.pointsPerEvent)
+      : metric === 'improvement'
+        ? `+${cleanPoints(entry.improvementPct)}%`
+        : cleanPoints(entry.points);
+    const label = metric === 'efficiency'
+      ? 'pts/prueba'
+      : metric === 'improvement'
+        ? 'mejora'
+        : 'pts';
+    const detail = metric === 'improvement'
+      ? `${entry.improvement.prueba} · ${entry.improvement.firstDisplay} a ${entry.improvement.fifthDisplay}`
+      : `${entry.events} prueba${entry.events !== 1 ? 's' : ''} tomada${entry.events !== 1 ? 's' : ''} · ${entry.testsCount} tipo${entry.testsCount !== 1 ? 's' : ''} de prueba`;
+
+    return `
+      <div class="ranking-row metrics-row ${index === 0 ? 'rk-gold' : index === 1 ? 'rk-silver' : index === 2 ? 'rk-bronze' : ''}" data-athlete-card="${entry.nombre}">
+        <div class="rk-pos">${entry.rank}</div>
+        <div class="rk-body">
+          <div class="rk-name">${entry.nombre}</div>
+          <div class="rk-events">${getDisplayGroup(entry.teamName)} · ${detail}</div>
+        </div>
+        <div class="rk-points">
+          <span class="rk-pts">${value}</span>
+          <span class="rk-pts-label">${label}</span>
+        </div>
+      </div>
+    `;
+  }).join('') : '<div class="metrics-note">No hay datos suficientes para este analisis.</div>';
+
+  list.querySelectorAll('[data-athlete-card]').forEach((card) => {
+    card.addEventListener('click', () => openAthleteDetail(card.dataset.athleteCard));
+  });
+}
+
+function renderIndividualAnalysis(rows) {
+  const analysis = buildIndividualAnalysisData(rows);
+  const summary = document.getElementById('individualSummary');
+  const note = document.getElementById('individualNote');
+  if (!summary || !note) return;
+
+  summary.innerHTML = `
     <article class="metric-card">
-      <span class="metric-label">Puntos del campeonato</span>
-      <strong class="metric-value">${cleanPoints(summary.totalAddedPoints)}</strong>
-      <span class="metric-copy">Puntaje total repartido dentro de este campeonato simulado de menores.</span>
+      <span class="metric-label">Atletas unicos</span>
+      <strong class="metric-value">${analysis.summary.athletes}</strong>
+      <span class="metric-copy">Participantes individuales con resultados validos y puntaje.</span>
     </article>
     <article class="metric-card">
-      <span class="metric-label">Equipos clasificados</span>
-      <strong class="metric-value">${summary.impactedTeams}</strong>
-      <span class="metric-copy">Clubes que sumarian puntos si los menores tuvieran su propio campeonato.</span>
+      <span class="metric-label">Pruebas tomadas</span>
+      <strong class="metric-value">${analysis.summary.totalEvents}</strong>
+      <span class="metric-copy">Salidas individuales puntuables acumuladas en las 5 fechas.</span>
     </article>
     <article class="metric-card">
-      <span class="metric-label">Lider general</span>
-      <strong class="metric-value metric-team">${summary.leader?.teamName || '-'}</strong>
-      <span class="metric-copy">${summary.leader ? `${cleanPoints(summary.leader.points)} pts en el campeonato de menores.` : 'Sin datos disponibles.'}</span>
+      <span class="metric-label">Mayor puntaje</span>
+      <strong class="metric-value metric-team">${analysis.summary.topTotal?.nombre || '-'}</strong>
+      <span class="metric-copy">${analysis.summary.topTotal ? `${cleanPoints(analysis.summary.topTotal.points)} pts totales.` : 'Sin datos disponibles.'}</span>
     </article>
     <article class="metric-card">
-      <span class="metric-label">Lideres por rama</span>
-      <strong class="metric-value metric-team">${summary.womenLeader?.teamName || '-'}</strong>
-      <span class="metric-copy">${summary.womenLeader ? `Damas: ${cleanPoints(summary.womenLeader.points)} pts` : 'Sin lider en damas.'}${summary.menLeader ? ` | Varones: ${summary.menLeader.teamName} ${cleanPoints(summary.menLeader.points)} pts` : ''}</span>
+      <span class="metric-label">Mejor pts/prueba</span>
+      <strong class="metric-value metric-team">${analysis.summary.topEfficiency?.nombre || '-'}</strong>
+      <span class="metric-copy">${analysis.summary.topEfficiency ? `${cleanPoints(analysis.summary.topEfficiency.pointsPerEvent)} pts por prueba.` : 'Sin datos disponibles.'}</span>
     </article>
   `;
 
   note.innerHTML = `
-    <strong>Supuesto de la simulacion:</strong> esta vista trata a la cuarta y sexta sesion como si fueran un campeonato separado de menores.
-    No se mezcla con el ranking oficial del meet. Individuales: 9-7-6-5-4-3-2-1. Postas: 18-14-12-10-8-6-4-2 por equipo.
-    Los empates reparten promedio y las postas siguen sumando solo al club.
+    <strong>Base del analisis:</strong> se cuentan solo pruebas individuales con puntos oficiales.
+    Puntos/prueba = suma de puntos dividida entre pruebas tomadas.
+    El incremento compara tiempos en porcentaje solo cuando existe la misma prueba en Primera y Quinta Fecha.
   `;
 
-  renderSimulationRanking('metricsListCombined', simulation.rankings.combined);
-  renderSimulationRanking('metricsListWomen', simulation.rankings.women);
-  renderSimulationRanking('metricsListMen', simulation.rankings.men);
+  renderIndividualRankingList('individualTotalList', analysis.totalRanking, 'total');
+  renderIndividualRankingList('individualEfficiencyList', analysis.efficiencyRanking, 'efficiency');
+  renderIndividualRankingList('individualImprovementList', analysis.improvementRanking, 'improvement');
+}
+
+function getAthleteRows(name) {
+  const key = normalizeAthleteName(name);
+  return allData.filter((row) => {
+    if (!row.relay) return normalizeAthleteName(row.nombre) === key;
+    return Array.isArray(row.integrantes) && row.integrantes.some((item) => normalizeAthleteName(item.nombre) === key);
+  });
+}
+
+function openAthleteDetail(name) {
+  const rows = getAthleteRows(name);
+  const individualRows = rows.filter((row) => !row.relay);
+  if (!rows.length) return;
+
+  const validIndividualRows = individualRows.filter((row) => !row.dq && !row.ns && !row.nt && !row.exhibition);
+  const points = validIndividualRows.reduce((sum, row) => sum + Number(row.puntosOficiales || row.puntos || 0), 0);
+  const medals = validIndividualRows.reduce((acc, row) => {
+    if (row.pos === 1) acc.gold += 1;
+    if (row.pos === 2) acc.silver += 1;
+    if (row.pos === 3) acc.bronze += 1;
+    return acc;
+  }, { gold: 0, silver: 0, bronze: 0 });
+  const bestTimeRow = validIndividualRows
+    .filter((row) => Number.isFinite(timeToSec(row.tiempo)))
+    .sort((a, b) => timeToSec(a.tiempo) - timeToSec(b.tiempo))[0];
+  const firstRow = rows.find((row) => normalizeAthleteName(row.nombre) === normalizeAthleteName(name))
+    || rows.find((row) => row.integrantes?.some((item) => normalizeAthleteName(item.nombre) === normalizeAthleteName(name)));
+  const primaryCategory = getPrimaryCategory(rows);
+
+  document.getElementById('athleteDetailTitle').textContent = name;
+  document.getElementById('athleteDetailMeta').textContent = `${primaryCategory} · ${firstRow?.genero || ''}`;
+  document.getElementById('athleteDetailSummary').innerHTML = `
+    <article class="metric-card">
+      <span class="metric-label">Puntos</span>
+      <strong class="metric-value">${cleanPoints(points)}</strong>
+      <span class="metric-copy">Puntos individuales acumulados.</span>
+    </article>
+    <article class="metric-card">
+      <span class="metric-label">Pruebas</span>
+      <strong class="metric-value">${individualRows.length}</strong>
+      <span class="metric-copy">${new Set(individualRows.map((row) => row.prueba)).size} pruebas distintas.</span>
+    </article>
+    <article class="metric-card">
+      <span class="metric-label">Medallas</span>
+      <strong class="metric-value metric-team">🥇 ${medals.gold} · 🥈 ${medals.silver} · 🥉 ${medals.bronze}</strong>
+      <span class="metric-copy">Podios individuales registrados.</span>
+    </article>
+    <article class="metric-card">
+      <span class="metric-label">Mejor marca</span>
+      <strong class="metric-value metric-team">${bestTimeRow?.displayTime || '-'}</strong>
+      <span class="metric-copy">${bestTimeRow ? `${bestTimeRow.prueba} · ${bestTimeRow.sesionNombre}` : 'Sin tiempos validos.'}</span>
+    </article>
+  `;
+  document.getElementById('athleteDetailResults').innerHTML = rows
+    .sort((a, b) => a.sesion - b.sesion || a.evento - b.evento)
+    .map((row) => `
+      <div class="ranking-row metrics-row">
+        <div class="rk-pos">${row.pos || (row.dq ? 'DQ' : row.ns ? 'NS' : row.nt ? 'NT' : '-')}</div>
+        <div class="rk-body">
+          <div class="rk-name">${row.prueba}</div>
+          <div class="rk-events">${row.sesionNombre} · Evento ${row.evento} · ${getDisplayCategoryForRow(row)}</div>
+        </div>
+        <div class="rk-points">
+          <span class="rk-pts">${row.displayTime}</span>
+          <span class="rk-pts-label">${row.puntos} pts</span>
+        </div>
+      </div>
+    `).join('');
+
+  document.getElementById('athleteDetailBackdrop').classList.add('open');
+  document.getElementById('athleteDetailModal').classList.add('open');
+  syncBodyScrollLock();
+}
+
+function closeAthleteDetail() {
+  document.getElementById('athleteDetailBackdrop')?.classList.remove('open');
+  document.getElementById('athleteDetailModal')?.classList.remove('open');
+  syncBodyScrollLock();
+}
+
+function renderMetrics(rows) {
+  renderIndividualAnalysis(rows);
   styleDominanceData = buildStyleDominanceData(rows);
   renderStyleMetrics();
   categoryDominanceData = buildCategoryDominanceData(rows);
   renderCategoryDominance();
-  renderHeatmaps(rows);
 }
 
 function getMetricStyle(row) {
@@ -991,7 +1281,10 @@ function buildStyleDominanceData(rows) {
       if (!totalsMap.has(entityKey)) {
         totalsMap.set(entityKey, mode === 'team'
           ? { teamName: row.teamName, totals: new Map() }
-          : { nombre: row.nombre, teamName: row.teamName, totals: new Map() });
+          : { nombre: row.nombre, teamName: row.categoria, totals: new Map() });
+      }
+      if (mode === 'athlete' && !isRealCategory(totalsMap.get(entityKey).teamName) && isRealCategory(row.categoria)) {
+        totalsMap.get(entityKey).teamName = row.categoria;
       }
       totalsMap.get(entityKey).totals.set(style, (totalsMap.get(entityKey).totals.get(style) || 0) + points);
 
@@ -1116,7 +1409,7 @@ function renderStyleMetrics() {
       <div class="rk-pos">${item.rank || index + 1}</div>
       <div class="rk-body">
         <div class="rk-name">${activeStyleDominanceType === 'team' ? item.teamName : item.nombre}</div>
-        <div class="rk-events">${activeStyleDominanceType === 'athlete' ? `${item.teamName} · ` : ''}${cleanPoints(item.points)} pts en ${selected.style}</div>
+        <div class="rk-events">${activeStyleDominanceType === 'athlete' ? `${getDisplayGroup(item.teamName)} · ` : ''}${cleanPoints(item.points)} pts en ${selected.style}</div>
       </div>
       <div class="rk-points">
         <span class="rk-pts">${cleanPoints(item.points)}</span>
@@ -1137,7 +1430,7 @@ function renderStyleMetrics() {
         <span class="metric-style-name">${activeStyleDominanceType === 'team' ? leader.teamName : leader.nombre}</span>
         <span class="metric-style-badge">${selected.ranking.length} ${modeCopy.plural} con puntos</span>
       </div>
-      ${activeStyleDominanceType === 'athlete' ? `<div class="metrics-note metrics-note-inline">${leader.teamName}</div>` : ''}
+      ${activeStyleDominanceType === 'athlete' ? `<div class="metrics-note metrics-note-inline">${getDisplayGroup(leader.teamName)}</div>` : ''}
       <div class="metrics-grid metrics-grid-compact">
         <article class="metric-card">
           <span class="metric-label">Puntos del lider</span>
@@ -1218,7 +1511,10 @@ function buildCategoryDominanceData(rows) {
         if (!categoryPoints.get(category).has(entityKey)) {
           categoryPoints.get(category).set(entityKey, mode === 'team'
             ? { teamName: row.teamName, points: 0 }
-            : { nombre: row.nombre, teamName: row.teamName, points: 0 });
+            : { nombre: row.nombre, teamName: row.categoria, points: 0 });
+        }
+        if (mode === 'athlete' && !isRealCategory(categoryPoints.get(category).get(entityKey).teamName) && isRealCategory(row.categoria)) {
+          categoryPoints.get(category).get(entityKey).teamName = row.categoria;
         }
         categoryPoints.get(category).get(entityKey).points += points;
 
@@ -1321,7 +1617,7 @@ function renderCategoryDominance() {
 
   note.innerHTML = `
     <strong>Base del análisis:</strong> ${typeConfig.baseCopy}
-    Usa los filtros para cambiar entre equipos o personas, elegir la categoría y la rama, y ver quién dominó mejor ese tramo de edades.
+    Usa los filtros para elegir la categoria y la rama, y ver quien domino mejor ese tramo de edades.
   `;
 
   if (!selected) {
@@ -1339,7 +1635,7 @@ function renderCategoryDominance() {
       <div class="rk-body">
         <div class="rk-name">${activeCategoryDominanceType === 'team' ? entry.teamName : entry.nombre}</div>
         <div class="rk-events">
-          ${activeCategoryDominanceType === 'athlete' ? `${entry.teamName} · ` : ''}${cleanPoints(entry.points)} pts · ${selected.totalPoints ? cleanPoints((entry.points / selected.totalPoints) * 100) : 0}% del total de la categoría
+          ${activeCategoryDominanceType === 'athlete' ? `${getDisplayGroup(entry.teamName)} · ` : ''}${cleanPoints(entry.points)} pts · ${selected.totalPoints ? cleanPoints((entry.points / selected.totalPoints) * 100) : 0}% del total de la categoría
         </div>
       </div>
       <div class="rk-points">
@@ -1361,7 +1657,7 @@ function renderCategoryDominance() {
         <span class="metric-style-name">${activeCategoryDominanceType === 'team' ? selected.leader.teamName : selected.leader.nombre}</span>
         <span class="metric-style-badge">${scopeLabels[activeCategoryDominanceScope]}</span>
       </div>
-      ${activeCategoryDominanceType === 'athlete' ? `<div class="metrics-note metrics-note-inline">${selected.leader.teamName}</div>` : ''}
+      ${activeCategoryDominanceType === 'athlete' ? `<div class="metrics-note metrics-note-inline">${getDisplayGroup(selected.leader.teamName)}</div>` : ''}
       <div class="metrics-grid metrics-grid-compact">
         <article class="metric-card">
           <span class="metric-label">Puntos del lider</span>
@@ -1489,7 +1785,7 @@ function initHeatmapDragScroll() {
 function buildMedallero(rows) {
   const medalists = new Map();
   const ensureEntry = (nombre, equipo, teamName, genero, entityType = 'athlete') => {
-    const key = `${entityType}|${nombre}|${equipo}`;
+    const key = `${entityType}|${normalizeAthleteName(nombre)}`;
     if (!medalists.has(key)) {
       medalists.set(key, {
         nombre,
@@ -1502,6 +1798,10 @@ function buildMedallero(rows) {
         bronze: 0,
         total: 0
       });
+    }
+    if (!isRealCategory(medalists.get(key).equipo) && isRealCategory(equipo)) {
+      medalists.get(key).equipo = equipo;
+      medalists.get(key).teamName = teamName || equipo;
     }
     return medalists.get(key);
   };
@@ -1517,20 +1817,11 @@ function buildMedallero(rows) {
     };
 
     if (row.relay && Array.isArray(row.integrantes) && row.integrantes.length) {
-      const teamEntry = ensureEntry(
-        row.teamName || row.nombre,
-        row.equipo,
-        row.teamName || row.equipo,
-        row.genero,
-        'team'
-      );
-      addMedal(teamEntry);
-
       row.integrantes.forEach((item) => {
         const athlete = ensureEntry(
           item.nombre,
-          row.equipo,
-          row.teamName || row.equipo,
+          row.categoria,
+          row.categoria,
           item.genero || row.genero,
           'athlete'
         );
@@ -1539,7 +1830,7 @@ function buildMedallero(rows) {
       return;
     }
 
-    const athlete = ensureEntry(row.nombre, row.equipo, row.teamName || row.equipo, row.genero, 'athlete');
+    const athlete = ensureEntry(row.nombre, row.categoria, row.categoria, row.genero, 'athlete');
     addMedal(athlete);
   });
 
@@ -1582,8 +1873,8 @@ function renderMedallero(rows) {
     card.className = 'ranking-row medallero-row';
     card.innerHTML = `
       <div class="rk-body">
-        <div class="rk-name">${athlete.nombre}</div>
-        <div class="rk-events"><span class="equipo-tag">${athlete.equipo}</span> · ${athlete.entityType === 'team' ? 'Equipo' : athlete.genero}</div>
+        <div class="rk-name">${getAthleteAction(athlete.nombre)}</div>
+        <div class="rk-events"><span class="equipo-tag">${athlete.equipo}</span> · ${athlete.genero}</div>
       </div>
       <div class="medal-summary">
         <span class="medal-pill gold">🥇 ${athlete.gold}</span>
@@ -1766,9 +2057,19 @@ function init() {
   document.getElementById('promoPopupClose').addEventListener('click', closePromoPopup);
   document.getElementById('promoPopupDismiss').addEventListener('click', closePromoPopup);
   document.getElementById('promoPopupBackdrop').addEventListener('click', closePromoPopup);
+  document.getElementById('athleteDetailClose').addEventListener('click', closeAthleteDetail);
+  document.getElementById('athleteDetailBackdrop').addEventListener('click', closeAthleteDetail);
   document.getElementById('promoPopupLink').addEventListener('click', () => {
     closePromoPopup();
   });
+
+  document.addEventListener('click', (event) => {
+    const athleteButton = event.target.closest('[data-athlete-name]');
+    if (!athleteButton) return;
+    event.preventDefault();
+    event.stopPropagation();
+    openAthleteDetail(athleteButton.dataset.athleteName);
+  }, true);
 
   ['filterSesion', 'filterGenero', 'filterPrueba', 'filterCategoria', 'filterEquipo'].forEach((id) => {
     document.getElementById(id).addEventListener('change', () => {
@@ -1783,7 +2084,10 @@ function init() {
   });
 
   document.addEventListener('keydown', (event) => {
-    if (event.key === 'Escape') closePromoPopup();
+    if (event.key === 'Escape') {
+      closePromoPopup();
+      closeAthleteDetail();
+    }
   });
 
   document.addEventListener('visibilitychange', () => {

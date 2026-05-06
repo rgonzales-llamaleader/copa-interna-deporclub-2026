@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
   <meta name="theme-color" content="#3b0764" />
   <link rel="icon" type="image/png" href="logo llama leads isotipo.png" />
-  <title>Fecha 1 Torneo Interno Deporclub 2026</title>
+  <title>Torneo Interno Deporclub 2025</title>
   <link rel="stylesheet" href="styles.css" />
   <script type="text/javascript">
     (function(c,l,a,r,i,t,y){
@@ -18,8 +18,8 @@
 <body>
 <header class="header">
   <div class="header-logo">🏊</div>
-  <h1>Fecha 1 Torneo Interno<br>Deporclub 2026</h1>
-  <p class="header-sub" id="headerSub">25 al 29 de marzo del 2026 · Resultados acumulados hasta el Evento 93</p>
+  <h1>Torneo Interno<br>Deporclub 2025</h1>
+  <p class="header-sub" id="headerSub">Clausura 2025 · 5 fechas disputadas</p>
   <a
     class="header-powered"
     href="https://llamaleads.pro/landing-copa-deporclub-2026"
@@ -35,10 +35,6 @@
   <div class="stat-chip">
     <div class="stat-value" id="statAtletas">—</div>
     <div class="stat-label">Atletas</div>
-  </div>
-  <div class="stat-chip">
-    <div class="stat-value" id="statEquipos">—</div>
-    <div class="stat-label">Equipos</div>
   </div>
   <div class="stat-chip">
     <div class="stat-value" id="statCategorias">—</div>
@@ -86,10 +82,6 @@
   <div class="ranking-header">
     <p class="ranking-subtitle" id="rankingSubtitle">Acumulado oficial vigente hasta el Evento 77</p>
   </div>
-  <div class="ranking-switch" id="rankingTypeSwitch">
-    <button class="ranking-switch-btn active" data-ranking-type="team">Equipos</button>
-    <button class="ranking-switch-btn" data-ranking-type="athlete">Personas</button>
-  </div>
   <div class="ranking-switch" id="rankingSwitch">
     <button class="ranking-switch-btn active" data-ranking-target="combined">Puntaje total</button>
     <button class="ranking-switch-btn" data-ranking-target="women">Mujeres</button>
@@ -97,15 +89,15 @@
   </div>
   <div class="ranking-sections">
     <section class="ranking-block active" data-ranking-panel="combined">
-      <h3 id="rankingHeadingCombined">Acumulado general por equipos</h3>
+      <h3 id="rankingHeadingCombined">Acumulado general por personas</h3>
       <div id="rankingListCombined"></div>
     </section>
     <section class="ranking-block" data-ranking-panel="women">
-      <h3 id="rankingHeadingWomen">Acumulado mujeres por equipos</h3>
+      <h3 id="rankingHeadingWomen">Acumulado mujeres por personas</h3>
       <div id="rankingListWomen"></div>
     </section>
     <section class="ranking-block" data-ranking-panel="men">
-      <h3 id="rankingHeadingMen">Acumulado hombres por equipos</h3>
+      <h3 id="rankingHeadingMen">Acumulado hombres por personas</h3>
       <div id="rankingListMen"></div>
     </section>
   </div>
@@ -113,7 +105,7 @@
 
 <div id="medallero" class="tab-content">
   <div class="ranking-header">
-    <p class="ranking-subtitle" id="medalleroSubtitle">Medallas acumuladas por persona y equipo hasta el Evento 77</p>
+    <p class="ranking-subtitle" id="medalleroSubtitle">Medallas acumuladas por persona hasta el Evento 77</p>
   </div>
   <div class="search-bar medallero-search">
     <div class="search-wrap">
@@ -129,11 +121,6 @@
       />
     </div>
   </div>
-  <div class="ranking-switch" id="medalleroSwitch">
-    <button class="ranking-switch-btn active" data-medallero-target="all">Todos</button>
-    <button class="ranking-switch-btn" data-medallero-target="athlete">Personas</button>
-    <button class="ranking-switch-btn" data-medallero-target="team">Equipos</button>
-  </div>
   <div class="results-info medallero-info">
     <span id="medalleroInfo"></span>
   </div>
@@ -142,43 +129,35 @@
 
 <div id="metricas" class="tab-content">
   <div class="ranking-header">
-    <p class="ranking-subtitle" id="metricsSubtitle">Explora simulaciones y patrones de fortaleza por equipo</p>
+    <p class="ranking-subtitle" id="metricsSubtitle">Explora rendimiento individual, consistencia y evolución por fecha</p>
   </div>
+  <div class="metrics-note metrics-click-note">Haz click sobre cualquier nombre de nadador para abrir su ficha con datos y resultados completos.</div>
   <div class="ranking-switch metrics-view-switch" id="metricsViewSwitch">
-    <button class="ranking-switch-btn active metrics-view-btn" data-metric-view="simulation">Simulacion Menores</button>
+    <button class="ranking-switch-btn active metrics-view-btn" data-metric-view="individual">Rendimiento individual</button>
     <button class="ranking-switch-btn metrics-view-btn" data-metric-view="dominance">Dominancia por estilos</button>
     <button class="ranking-switch-btn metrics-view-btn" data-metric-view="category-dominance">Dominancia por categorias</button>
   </div>
 
-  <section class="metrics-view active" data-metric-panel="simulation">
-    <div class="metrics-grid" id="metricsSummary"></div>
-    <div class="metrics-note" id="metricsNote"></div>
-    <div class="ranking-switch metrics-switch" id="metricsSimulationSwitch">
-      <button class="ranking-switch-btn active metrics-switch-btn" data-metrics-target="combined">General menores</button>
-      <button class="ranking-switch-btn metrics-switch-btn" data-metrics-target="women">Mujeres</button>
-      <button class="ranking-switch-btn metrics-switch-btn" data-metrics-target="men">Hombres</button>
-    </div>
-    <div class="ranking-sections metrics-sections">
-      <section class="ranking-block metrics-block active" data-metrics-panel="combined">
-        <h3>Campeonato simulado de menores</h3>
-        <div id="metricsListCombined"></div>
+  <section class="metrics-view active" data-metric-panel="individual">
+    <div class="metrics-grid" id="individualSummary"></div>
+    <div class="metrics-note" id="individualNote"></div>
+    <div class="ranking-sections metrics-sections individual-sections">
+      <section class="ranking-block metrics-block active">
+        <h3>Ranking individual</h3>
+        <div id="individualTotalList"></div>
       </section>
-      <section class="ranking-block metrics-block" data-metrics-panel="women">
-        <h3>Ranking simulado mujeres</h3>
-        <div id="metricsListWomen"></div>
+      <section class="ranking-block metrics-block active">
+        <h3>Puntos por prueba</h3>
+        <div id="individualEfficiencyList"></div>
       </section>
-      <section class="ranking-block metrics-block" data-metrics-panel="men">
-        <h3>Ranking simulado hombres</h3>
-        <div id="metricsListMen"></div>
+      <section class="ranking-block metrics-block active">
+        <h3>Mejor mejora de tiempo Fecha 1 vs Fecha 5</h3>
+        <div id="individualImprovementList"></div>
       </section>
     </div>
   </section>
 
   <section class="metrics-view" data-metric-panel="dominance">
-    <div class="ranking-switch" id="styleDominanceTypeSwitch">
-      <button class="ranking-switch-btn active style-type-btn" data-style-type="team">Equipos</button>
-      <button class="ranking-switch-btn style-type-btn" data-style-type="athlete">Personas</button>
-    </div>
     <div class="metrics-grid" id="styleLeadersSummary"></div>
     <div class="metrics-note" id="styleDominanceNote"></div>
     <div class="metrics-dual">
@@ -187,17 +166,13 @@
         <div id="styleDominanceList"></div>
       </div>
       <div class="metrics-panel">
-        <h3 id="styleProfileListTitle">Estilo dominante por equipo</h3>
+        <h3 id="styleProfileListTitle">Detalle individual</h3>
         <div id="teamStyleProfileList"></div>
       </div>
     </div>
   </section>
 
   <section class="metrics-view" data-metric-panel="category-dominance">
-    <div class="ranking-switch" id="categoryDominanceTypeSwitch">
-      <button class="ranking-switch-btn active category-type-btn" data-category-type="team">Equipos</button>
-      <button class="ranking-switch-btn category-type-btn" data-category-type="athlete">Personas</button>
-    </div>
     <div class="metrics-filters">
       <div class="metrics-filter-field">
         <label for="categoryDominanceFilter">Categoria</label>
@@ -213,7 +188,7 @@
     <div class="metrics-note" id="categoryDominanceNote"></div>
     <div class="metrics-dual">
       <div class="metrics-panel">
-        <h3 id="categoryDominanceListTitle">Ranking de equipos por categoria</h3>
+        <h3 id="categoryDominanceListTitle">Ranking de personas por categoria</h3>
         <div id="categoryDominanceList"></div>
       </div>
       <div class="metrics-panel">
@@ -223,29 +198,6 @@
     </div>
   </section>
 
-  <section class="metrics-view" data-metric-panel="style-heatmap">
-    <div class="metrics-note" id="styleHeatmapNote"></div>
-    <div class="heatmap-wrap">
-      <div class="heatmap-legend">
-        <span>Baja intensidad</span>
-        <div class="heatmap-legend-bar heatmap-legend-style"></div>
-        <span>Alta intensidad</span>
-      </div>
-      <div id="styleHeatmap"></div>
-    </div>
-  </section>
-
-  <section class="metrics-view" data-metric-panel="category-heatmap">
-    <div class="metrics-note" id="categoryHeatmapNote"></div>
-    <div class="heatmap-wrap">
-      <div class="heatmap-legend">
-        <span>Baja intensidad</span>
-        <div class="heatmap-legend-bar heatmap-legend-category"></div>
-        <span>Alta intensidad</span>
-      </div>
-      <div id="categoryHeatmap"></div>
-    </div>
-  </section>
 </div>
 
 <div id="resultados" class="tab-content">
@@ -303,7 +255,7 @@
     </div>
 
     <div class="sheet-field">
-      <label>Equipo / Club</label>
+      <label>Grupo / categoría</label>
       <select id="filterEquipo">
         <option value="">Todos</option>
       </select>
@@ -325,7 +277,7 @@
 </div>
 
 <footer>
-  <p>Fecha 1 Torneo Interno Deporclub 2026</p>
+  <p>Torneo Interno Deporclub 2025</p>
   <p>EXH = Exhibition (no puntúa) · DQ = Disqualified · NS = No Show · NT = No Time</p>
   <a
     class="footer-powered"
@@ -348,6 +300,25 @@
 </footer>
 
 <div class="sheet-backdrop" id="sheetBackdrop"></div>
+
+<div class="athlete-detail-backdrop" id="athleteDetailBackdrop"></div>
+<div class="athlete-detail-modal" id="athleteDetailModal" role="dialog" aria-modal="true" aria-labelledby="athleteDetailTitle">
+  <button class="athlete-detail-close" id="athleteDetailClose" aria-label="Cerrar detalle">✕</button>
+  <div class="athlete-detail-header">
+    <div>
+      <span class="athlete-detail-kicker">Detalle del nadador</span>
+      <h2 id="athleteDetailTitle">Nadador</h2>
+      <p id="athleteDetailMeta"></p>
+    </div>
+  </div>
+  <div class="metrics-grid athlete-detail-summary" id="athleteDetailSummary"></div>
+  <div class="athlete-detail-grid">
+    <section class="athlete-detail-section">
+      <h3>Resultados completos</h3>
+      <div id="athleteDetailResults"></div>
+    </section>
+  </div>
+</div>
 
 <div class="promo-popup-backdrop" id="promoPopupBackdrop"></div>
 <div class="promo-popup" id="promoPopup" role="dialog" aria-modal="true" aria-labelledby="promoPopupTitle">
