@@ -34,6 +34,7 @@ let activeEquipo = '';
 let activeBuscar = '';
 let activePodioSesion = 'all';
 let activePodioGenero = 'all';
+let activePodioCategoria = 'all';
 let activeMedalBuscar = '';
 let activeMedalleroType = 'all';
 let activeRankingType = 'athlete';
@@ -378,6 +379,7 @@ function applyFilters() {
 function initCategoryPills(data) {
   const dateContainer = document.getElementById('datePills');
   const genderContainer = document.getElementById('genderPills');
+  const categoryContainer = document.getElementById('categoryPills');
   const sessionPills = [...new Map(
     [...data]
       .sort((a, b) => a.sesion - b.sesion || a.evento - b.evento)
@@ -399,6 +401,16 @@ function initCategoryPills(data) {
       .map((gender) => ({ label: gender, value: gender }))
   ];
 
+  const categoryPills = [
+    { label: 'Todas', value: 'all' },
+    ...[...new Set(data.map((row) => row.categoria))]
+      .sort((a, b) => (
+        getCategorySortRank(a) - getCategorySortRank(b)
+        || a.localeCompare(b, 'es')
+      ))
+      .map((category) => ({ label: category, value: category }))
+  ];
+
   datePills.forEach((pill, index) => {
     const btn = document.createElement('button');
     btn.className = `pill-btn podio-date-btn${index === 0 ? ' active' : ''}`;
@@ -407,7 +419,7 @@ function initCategoryPills(data) {
       document.querySelectorAll('.podio-date-btn').forEach((node) => node.classList.remove('active'));
       btn.classList.add('active');
       activePodioSesion = pill.value;
-      renderPodios(data, activePodioSesion, activePodioGenero);
+      renderPodios(data, activePodioSesion, activePodioGenero, activePodioCategoria);
     });
     dateContainer.appendChild(btn);
   });
@@ -420,13 +432,26 @@ function initCategoryPills(data) {
       document.querySelectorAll('.podio-gender-btn').forEach((node) => node.classList.remove('active'));
       btn.classList.add('active');
       activePodioGenero = pill.value;
-      renderPodios(data, activePodioSesion, activePodioGenero);
+      renderPodios(data, activePodioSesion, activePodioGenero, activePodioCategoria);
     });
     genderContainer.appendChild(btn);
   });
+
+  categoryPills.forEach((pill, index) => {
+    const btn = document.createElement('button');
+    btn.className = `pill-btn podio-category-btn${index === 0 ? ' active' : ''}`;
+    btn.textContent = pill.label;
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.podio-category-btn').forEach((node) => node.classList.remove('active'));
+      btn.classList.add('active');
+      activePodioCategoria = pill.value;
+      renderPodios(data, activePodioSesion, activePodioGenero, activePodioCategoria);
+    });
+    categoryContainer.appendChild(btn);
+  });
 }
 
-function renderPodios(data, sessionFilter = 'all', genderFilter = 'all') {
+function renderPodios(data, sessionFilter = 'all', genderFilter = 'all', categoryFilter = 'all') {
   const grid = document.getElementById('podiosGrid');
   grid.innerHTML = '';
 
@@ -434,6 +459,7 @@ function renderPodios(data, sessionFilter = 'all', genderFilter = 'all') {
   data.forEach((row) => {
     if (sessionFilter !== 'all' && getSessionPillLabel(row.sesionNombre) !== sessionFilter) return;
     if (genderFilter !== 'all' && row.genero !== genderFilter) return;
+    if (categoryFilter !== 'all' && row.categoria !== categoryFilter) return;
     const key = `${row.evento}|${row.genero}|${row.prueba}|${row.categoria}`;
     if (!grouped.has(key)) grouped.set(key, []);
     grouped.get(key).push(row);
