@@ -1682,81 +1682,12 @@ footer a {
   gap: .55rem;
 }
 
-.session-ranking-panel {
-  margin-top: 1.25rem;
-  padding-top: 1.25rem;
-  border-top: 1px solid var(--border);
+.ranking-filter-group {
+  margin-bottom: .7rem;
 }
 
-.session-ranking-head {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 1rem;
-  margin-bottom: .75rem;
-}
-
-.session-ranking-head h3 {
-  font-size: .95rem;
-  font-weight: 800;
-  color: var(--navy);
-  margin-bottom: .25rem;
-}
-
-.session-ranking-switch {
-  margin-bottom: .75rem;
-}
-
-.session-winner-card {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 1rem;
-  padding: 1rem;
-  margin-bottom: .75rem;
-  background: linear-gradient(180deg, rgba(255, 255, 255, .98), rgba(243, 232, 255, .55));
-  border: 1px solid rgba(168, 85, 247, .22);
-  border-radius: var(--radius-sm);
-  box-shadow: 0 10px 24px rgba(126, 34, 206, .08);
-}
-
-.session-winner-name {
-  display: block;
-  margin: .25rem 0;
-  font-size: 1.05rem;
-  font-weight: 900;
-  color: var(--navy);
-}
-
-.session-winner-score {
-  min-width: 68px;
-  text-align: right;
-}
-
-.session-winner-score span {
-  display: block;
-  font-size: 2rem;
-  line-height: 1;
-  font-weight: 900;
-  color: var(--blue);
-  font-variant-numeric: tabular-nums;
-}
-
-.session-winner-score small {
-  font-size: .68rem;
-  text-transform: uppercase;
-  letter-spacing: .06em;
-  font-weight: 800;
-  color: var(--muted);
-}
-
-.session-ranking-list {
-  display: grid;
-  gap: .55rem;
-}
-
-.session-ranking-row .rk-name {
-  white-space: normal;
+.ranking-filter-switch {
+  margin: .35rem 0 0;
 }
 
 .medallero-search {

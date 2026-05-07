@@ -37,6 +37,8 @@ let activePodioGenero = 'all';
 let activeMedalBuscar = '';
 let activeMedalleroType = 'all';
 let activeRankingType = 'athlete';
+let activeRankingScope = 'categories';
+let activeRankingSession = 'all';
 let activeStyleDominanceType = 'athlete';
 let activeStyleDominanceFilter = '';
 let activeCategoryDominanceScope = 'combined';
@@ -45,8 +47,6 @@ let activeCategoryDominanceType = 'athlete';
 let expandedRelayResults = new Set();
 let promoPopupTimer = null;
 let rankingViews = null;
-let sessionRankingData = null;
-let activeSessionRankingKey = '';
 let styleDominanceData = null;
 let categoryDominanceData = null;
 
@@ -62,6 +62,10 @@ function getSessionPillLabel(sessionName) {
 
 function getDisplayGroup(value) {
   return value === 'Absoluto' ? 'Todos' : value;
+}
+
+function getCategorySortRank(category) {
+  return category === 'Absoluto' ? 999 : 0;
 }
 
 function isRealCategory(value) {
@@ -134,15 +138,16 @@ function getRecordRefs(row) {
 
 function getPodioMeta(row) {
   if (row.relay) return `Relevo ${row.relayLabel} · ${row.puntos} pts`;
-  if (row.edad === null || row.edad === undefined || row.edad === '') return `${row.categoria} · ${row.puntos} pts`;
-  return `${row.edad} años · ${row.puntos} pts`;
+  const turno = row.turno ? `${row.turno} · ` : '';
+  if (row.edad === null || row.edad === undefined || row.edad === '') return `${turno}${row.puntos} pts`;
+  return `${turno}${row.edad} años · ${row.puntos} pts`;
 }
 
 function getResultSecondaryMeta(row) {
-  if (!row.relay || !Array.isArray(row.integrantes) || !row.integrantes.length) return `${row.genero} Â· ${row.sesionNombre}`;
-  return `Relevo ${row.relayLabel} Â· ${row.integrantes.map((item) => item.nombre).join(' / ')}`;
+  const turno = row.turno ? ` · ${row.turno}` : '';
+  if (!row.relay || !Array.isArray(row.integrantes) || !row.integrantes.length) return `${row.genero} · ${row.sesionNombre}${turno}`;
+  return `Relevo ${row.relayLabel} · ${row.integrantes.map((item) => item.nombre).join(' / ')}`;
 }
-
 function getAthleteAction(name, label = name) {
   return `<button class="athlete-link" type="button" data-athlete-name="${name}">${label}</button>`;
 }
@@ -214,17 +219,21 @@ function updateRankingCopy(processedRows = allData.length) {
   const rankingSubtitle = document.getElementById('rankingSubtitle');
   const officialUntilEvent = RECORDS.validacion?.officialUntilEvent || RECORDS.meta.eventos;
   const corte = RECORDS.validacion?.provisional ? 'Corte preliminar' : 'Acumulado oficial';
+  const tournamentLabel = activeRankingScope === 'absolute' ? 'torneo Absoluto' : 'torneo por Categorias';
+  const sessionLabel = activeRankingSession === 'all' ? 'todas las fechas' : activeRankingSession;
 
   if (!rankingSubtitle) return;
 
-  rankingSubtitle.textContent = `${corte} por personas hasta el Evento ${officialUntilEvent} · ${processedRows} resultados procesados · las postas no suman puntos individuales`;
+  rankingSubtitle.textContent = `${corte} del ${tournamentLabel} · ${sessionLabel} · hasta el Evento ${officialUntilEvent} · las postas no suman puntos individuales`;
 }
 
 function updateRankingHeadings() {
+  const tournamentLabel = activeRankingScope === 'absolute' ? 'Absoluto' : 'Categorias';
+  const sessionLabel = activeRankingSession === 'all' ? 'todas las fechas' : activeRankingSession;
   const labels = {
-    combined: 'Acumulado general por personas',
-    women: 'Acumulado mujeres por personas',
-    men: 'Acumulado hombres por personas'
+    combined: `${tournamentLabel} · general · ${sessionLabel}`,
+    women: `${tournamentLabel} · mujeres · ${sessionLabel}`,
+    men: `${tournamentLabel} · hombres · ${sessionLabel}`
   };
 
   document.getElementById('rankingHeadingCombined').textContent = labels.combined;
@@ -431,7 +440,11 @@ function renderPodios(data, sessionFilter = 'all', genderFilter = 'all') {
   });
 
   [...grouped.values()]
-    .sort((a, b) => a[0].evento - b[0].evento || a[0].categoria.localeCompare(b[0].categoria, 'es'))
+    .sort((a, b) => (
+      a[0].evento - b[0].evento
+      || getCategorySortRank(a[0].categoria) - getCategorySortRank(b[0].categoria)
+      || a[0].categoria.localeCompare(b[0].categoria, 'es')
+    ))
     .forEach((rows) => {
       const first = rows[0];
       const recordRefs = getRecordRefs(first);
@@ -653,6 +666,10 @@ function scrollToTop() {
 function renderRankingList(targetId, rows, mode = 'team') {
   const list = document.getElementById(targetId);
   list.innerHTML = '';
+  if (!rows.length) {
+    list.innerHTML = '<div class="metrics-note">No hay puntos individuales para estos filtros.</div>';
+    return;
+  }
   rows.forEach((entry, index) => {
     const wrapper = document.createElement('div');
     wrapper.className = `ranking-row ${index === 0 ? 'rk-gold' : index === 1 ? 'rk-silver' : index === 2 ? 'rk-bronze' : ''}`;
@@ -690,8 +707,10 @@ function buildRankedTable(pointsMap) {
   });
 }
 
-function buildAthleteRankingData(rows) {
+function buildAthleteRankingData(rows, options = {}) {
   const officialUntilEvent = RECORDS.validacion?.officialUntilEvent || RECORDS.meta.eventos;
+  const scope = options.scope || 'categories';
+  const session = options.session || 'all';
   const buckets = {
     combined: new Map(),
     women: new Map(),
@@ -712,6 +731,8 @@ function buildAthleteRankingData(rows) {
   rows
     .filter((row) => (
       row.evento <= officialUntilEvent
+      && (scope === 'absolute' ? row.categoria === 'Absoluto' : row.categoria !== 'Absoluto')
+      && (session === 'all' || row.sesionNombre === session)
       && !row.relay
       && Number(row.puntosOficiales || row.puntos || 0) > 0
       && !row.exhibition
@@ -721,9 +742,10 @@ function buildAthleteRankingData(rows) {
     ))
     .forEach((row) => {
       const points = Number(row.puntosOficiales || row.puntos || 0);
-      ensureAthlete('combined', row.nombre, row.categoria).points += points;
-      if (row.genero === 'Damas') ensureAthlete('women', row.nombre, row.categoria).points += points;
-      if (row.genero === 'Varones') ensureAthlete('men', row.nombre, row.categoria).points += points;
+      const displayCategory = getDisplayCategoryForRow(row);
+      ensureAthlete('combined', row.nombre, displayCategory).points += points;
+      if (row.genero === 'Damas') ensureAthlete('women', row.nombre, displayCategory).points += points;
+      if (row.genero === 'Varones') ensureAthlete('men', row.nombre, displayCategory).points += points;
     });
 
   const rankEntries = (items) => {
@@ -749,7 +771,12 @@ function buildAthleteRankingData(rows) {
 }
 
 function syncRankingView(processedRows = allData.length) {
-  if (!rankingViews) return;
+  rankingViews = {
+    athlete: buildAthleteRankingData(allData, {
+      scope: activeRankingScope,
+      session: activeRankingSession
+    })
+  };
 
   const current = rankingViews[activeRankingType];
   renderRankingList('rankingListCombined', current.combined, activeRankingType);
@@ -871,131 +898,6 @@ function getScoringIndividualRows(rows) {
     && !row.ns
     && !row.nt
   ));
-}
-
-function buildSessionRankingData(rows) {
-  const sessions = new Map();
-
-  getScoringIndividualRows(rows).forEach((row) => {
-    const sessionKey = row.sesionNombre;
-    const athleteKey = normalizeAthleteName(row.nombre);
-    if (!sessionKey || !athleteKey) return;
-
-    if (!sessions.has(sessionKey)) {
-      sessions.set(sessionKey, {
-        key: sessionKey,
-        label: getSessionPillLabel(sessionKey),
-        order: row.sesion || 999,
-        athletes: new Map(),
-        totalPoints: 0,
-        totalEvents: 0
-      });
-    }
-
-    const session = sessions.get(sessionKey);
-    if (!session.athletes.has(athleteKey)) {
-      session.athletes.set(athleteKey, {
-        nombre: row.nombre,
-        teamName: row.categoria,
-        genero: row.genero,
-        points: 0,
-        events: 0,
-        wins: 0,
-        tests: new Set()
-      });
-    }
-
-    const athlete = session.athletes.get(athleteKey);
-    const points = Number(row.puntosOficiales || row.puntos || 0);
-    if (!isRealCategory(athlete.teamName) && isRealCategory(row.categoria)) {
-      athlete.teamName = row.categoria;
-    }
-    athlete.points += points;
-    athlete.events += 1;
-    athlete.tests.add(row.prueba);
-    if (row.pos === 1) athlete.wins += 1;
-    session.totalPoints += points;
-    session.totalEvents += 1;
-    session.order = Math.min(session.order, row.sesion || 999);
-  });
-
-  return [...sessions.values()]
-    .sort((a, b) => a.order - b.order || a.label.localeCompare(b.label, 'es'))
-    .map((session) => {
-      const entries = rankByValue(
-        [...session.athletes.values()].map((athlete) => ({
-          ...athlete,
-          points: Number(cleanPoints(athlete.points)),
-          testsCount: athlete.tests.size
-        })),
-        'points'
-      );
-
-      return {
-        ...session,
-        entries,
-        winner: entries[0] || null,
-        totalPoints: Number(cleanPoints(session.totalPoints))
-      };
-    });
-}
-
-function renderSessionRanking() {
-  const switchEl = document.getElementById('sessionRankingSwitch');
-  const winnerEl = document.getElementById('sessionWinnerCard');
-  const listEl = document.getElementById('sessionRankingList');
-  if (!switchEl || !winnerEl || !listEl || !sessionRankingData?.length) return;
-
-  if (!activeSessionRankingKey || !sessionRankingData.some((session) => session.key === activeSessionRankingKey)) {
-    activeSessionRankingKey = sessionRankingData[0].key;
-  }
-
-  switchEl.innerHTML = sessionRankingData.map((session) => `
-    <button
-      class="ranking-switch-btn session-ranking-btn${session.key === activeSessionRankingKey ? ' active' : ''}"
-      data-session-ranking="${session.key}"
-      type="button"
-    >
-      ${session.label}
-    </button>
-  `).join('');
-
-  const activeSession = sessionRankingData.find((session) => session.key === activeSessionRankingKey);
-  const winner = activeSession?.winner;
-
-  winnerEl.innerHTML = winner ? `
-    <div>
-      <span class="metric-label">Ganador de ${activeSession.label}</span>
-      <strong class="session-winner-name">${getAthleteAction(winner.nombre)}</strong>
-      <span class="metric-copy">${getDisplayGroup(winner.teamName)} · ${cleanPoints(winner.points)} pts · ${winner.events} prueba${winner.events !== 1 ? 's' : ''}</span>
-    </div>
-    <div class="session-winner-score">
-      <span>${cleanPoints(winner.points)}</span>
-      <small>pts</small>
-    </div>
-  ` : '<div class="metrics-note">No hay datos puntuables para esta fecha.</div>';
-
-  const topRows = activeSession.entries.slice(0, 15);
-  listEl.innerHTML = topRows.length ? topRows.map((entry, index) => `
-    <div class="ranking-row session-ranking-row ${index === 0 ? 'rk-gold' : index === 1 ? 'rk-silver' : index === 2 ? 'rk-bronze' : ''}">
-      <div class="rk-pos">${entry.rank}</div>
-      <div class="rk-body">
-        <div class="rk-name">${getAthleteAction(entry.nombre)}</div>
-        <div class="rk-events">${getDisplayGroup(entry.teamName)} · ${entry.events} prueba${entry.events !== 1 ? 's' : ''} · ${entry.wins} victoria${entry.wins !== 1 ? 's' : ''}</div>
-      </div>
-      <div class="rk-points">
-        <span class="rk-pts">${cleanPoints(entry.points)}</span>
-        <span class="rk-pts-label">pts</span>
-      </div>
-    </div>
-  `).join('') : '<div class="metrics-note">No hay datos puntuables para esta fecha.</div>';
-
-  switchEl.querySelectorAll('[data-session-ranking]').forEach((button) => {
-    button.addEventListener('click', () => {
-      activeSessionRankingKey = button.dataset.sessionRanking;
-      renderSessionRanking();
-    });
-  });
 }
 
 function rankByValue(items, valueKey, labelKey = 'nombre') {
@@ -1200,8 +1102,8 @@ function renderIndividualAnalysis(rows) {
 
   note.innerHTML = `
     <strong>Base del analisis:</strong> se cuentan solo pruebas individuales con puntos oficiales.
+    Este rendimiento suma el puntaje obtenido en categorias y en absoluto.
     Puntos/prueba = suma de puntos dividida entre pruebas tomadas.
-    El incremento compara tiempos en porcentaje solo cuando existe la misma prueba en Primera y Quinta Fecha.
   `;
 
   renderIndividualRankingList('individualTotalList', analysis.totalRanking, 'total');
@@ -1268,7 +1170,7 @@ function openAthleteDetail(name) {
         <div class="rk-pos">${row.pos || (row.dq ? 'DQ' : row.ns ? 'NS' : row.nt ? 'NT' : '-')}</div>
         <div class="rk-body">
           <div class="rk-name">${row.prueba}</div>
-          <div class="rk-events">${row.sesionNombre} · Evento ${row.evento} · ${getDisplayCategoryForRow(row)}</div>
+          <div class="rk-events">${row.sesionNombre} · Evento ${row.evento} · ${getDisplayCategoryForRow(row)}${row.turno ? ` · ${row.turno}` : ''}</div>
         </div>
         <div class="rk-points">
           <span class="rk-pts">${row.displayTime}</span>
@@ -2039,6 +1941,47 @@ function initRankingSwitch() {
   });
 }
 
+function initRankingFilterControls(data) {
+  const tournamentButtons = document.querySelectorAll('[data-ranking-scope]');
+  const sessionSwitch = document.getElementById('rankingSessionSwitch');
+  const sessions = [...new Map(
+    [...data]
+      .sort((a, b) => a.sesion - b.sesion || a.evento - b.evento)
+      .map((row) => [row.sesionNombre, row.sesion])
+  ).entries()];
+
+  if (sessionSwitch) {
+    sessionSwitch.innerHTML = [
+      { label: 'Todas', value: 'all' },
+      ...sessions.map(([label]) => ({ label, value: label }))
+    ].map((session, index) => `
+      <button
+        class="ranking-switch-btn ranking-session-btn${index === 0 ? ' active' : ''}"
+        data-ranking-session="${session.value}"
+        type="button"
+      >
+        ${session.label}
+      </button>
+    `).join('');
+  }
+
+  tournamentButtons.forEach((button) => {
+    button.addEventListener('click', () => {
+      activeRankingScope = button.dataset.rankingScope;
+      tournamentButtons.forEach((node) => node.classList.toggle('active', node === button));
+      syncRankingView();
+    });
+  });
+
+  document.querySelectorAll('[data-ranking-session]').forEach((button) => {
+    button.addEventListener('click', () => {
+      activeRankingSession = button.dataset.rankingSession;
+      document.querySelectorAll('[data-ranking-session]').forEach((node) => node.classList.toggle('active', node === button));
+      syncRankingView();
+    });
+  });
+}
+
 function initRankingTypeSwitch() {
   const buttons = document.querySelectorAll('[data-ranking-type]');
   buttons.forEach((button) => {
@@ -2132,28 +2075,28 @@ function initStyleDominanceControls() {
 }
 
 function init() {
-  allData = RECORDS.resultados;
+  allData = [...RECORDS.resultados].sort((a, b) => (
+    a.evento - b.evento
+    || getCategorySortRank(a.categoria) - getCategorySortRank(b.categoria)
+    || a.categoria.localeCompare(b.categoria, 'es')
+    || a.genero.localeCompare(b.genero, 'es')
+    || (a.pos || 999) - (b.pos || 999)
+  ));
   filtered = [...allData];
   rankingViews = {
-    team: {
-      combined: RECORDS.rankingsOficiales.combined,
-      women: RECORDS.rankingsOficiales.women,
-      men: RECORDS.rankingsOficiales.men
-    },
     athlete: buildAthleteRankingData(allData)
   };
-  sessionRankingData = buildSessionRankingData(allData);
 
   renderStats(allData);
   renderDatasetCopy(allData);
   buildFilterOptions(allData);
   initTabs();
   initCategoryPills(allData);
+  initRankingFilterControls(allData);
   renderPodios(allData);
   renderResults();
   updateResultsInfo();
   syncRankingView(allData.length);
-  renderSessionRanking();
   renderMedallero(allData);
   renderMetrics(allData);
   initRankingSwitch();
