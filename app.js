@@ -40,6 +40,7 @@ let activeMedalleroType = 'all';
 let activeRankingType = 'athlete';
 let activeRankingScope = 'categories';
 let activeRankingSession = 'all';
+let activeRankingCategory = 'all';
 let activeStyleDominanceType = 'athlete';
 let activeStyleDominanceFilter = '';
 let activeCategoryDominanceScope = 'combined';
@@ -222,19 +223,29 @@ function updateRankingCopy(processedRows = allData.length) {
   const corte = RECORDS.validacion?.provisional ? 'Corte preliminar' : 'Acumulado oficial';
   const tournamentLabel = activeRankingScope === 'absolute' ? 'torneo Absoluto' : 'torneo por Categorias';
   const sessionLabel = activeRankingSession === 'all' ? 'todas las fechas' : activeRankingSession;
+  const categoryLabel = activeRankingScope === 'absolute'
+    ? ''
+    : activeRankingCategory === 'all'
+      ? ' · todas las categorias'
+      : ` · ${activeRankingCategory}`;
 
   if (!rankingSubtitle) return;
 
-  rankingSubtitle.textContent = `${corte} del ${tournamentLabel} · ${sessionLabel} · hasta el Evento ${officialUntilEvent} · las postas no suman puntos individuales`;
+  rankingSubtitle.textContent = `${corte} del ${tournamentLabel} · ${sessionLabel}${categoryLabel} · hasta el Evento ${officialUntilEvent} · las postas no suman puntos individuales`;
 }
 
 function updateRankingHeadings() {
   const tournamentLabel = activeRankingScope === 'absolute' ? 'Absoluto' : 'Categorias';
   const sessionLabel = activeRankingSession === 'all' ? 'todas las fechas' : activeRankingSession;
+  const categoryLabel = activeRankingScope === 'absolute'
+    ? ''
+    : activeRankingCategory === 'all'
+      ? ''
+      : ` · ${activeRankingCategory}`;
   const labels = {
-    combined: `${tournamentLabel} · general · ${sessionLabel}`,
-    women: `${tournamentLabel} · mujeres · ${sessionLabel}`,
-    men: `${tournamentLabel} · hombres · ${sessionLabel}`
+    combined: `${tournamentLabel}${categoryLabel} · general · ${sessionLabel}`,
+    women: `${tournamentLabel}${categoryLabel} · mujeres · ${sessionLabel}`,
+    men: `${tournamentLabel}${categoryLabel} · hombres · ${sessionLabel}`
   };
 
   document.getElementById('rankingHeadingCombined').textContent = labels.combined;
@@ -552,91 +563,88 @@ function statusTag(row) {
 function renderResults() {
   const list = document.getElementById('resultsList');
   list.innerHTML = '';
+  document.getElementById('pagination').innerHTML = '';
 
-  const start = (currentPage - 1) * PAGE_SIZE;
-  const page = filtered.slice(start, start + PAGE_SIZE);
-
-  if (!page.length) {
+  if (!filtered.length) {
     list.innerHTML = `
       <div class="no-results">
         <div class="no-results-icon">🔍</div>
         <p>Sin resultados para los filtros aplicados</p>
       </div>`;
-    renderPagination(0);
     return;
   }
 
-  page.forEach((row) => {
-    const card = document.createElement('div');
-    let posClass = 'other';
-    let posLabel = row.pos ?? '—';
-
-    if (row.ns) {
-      posClass = 'dq-pos';
-      posLabel = 'NS';
-    } else if (row.nt) {
-      posClass = 'dq-pos';
-      posLabel = 'NT';
-    } else if (row.dq) {
-      posClass = 'dq-pos';
-      posLabel = 'DQ';
-    } else if (row.pos === 1) posClass = 'gold';
-    else if (row.pos === 2) posClass = 'silver';
-    else if (row.pos === 3) posClass = 'bronze';
-
-    const recordBadge = getRecordBadge(row);
-    const isRelayExpanded = row.relay && expandedRelayResults.has(getRelayResultKey(row));
-    const relayToggle = row.relay
-      ? `<button class="equipo-tag equipo-tag-btn" type="button" data-relay-toggle="${getRelayResultKey(row)}">${getDisplayCategoryForRow(row)}</button>`
-      : `<span class="equipo-tag">${getDisplayCategoryForRow(row)}</span>`;
-    const relayMembers = row.relay && Array.isArray(row.integrantes) && row.integrantes.length
-      ? `
-        <div class="rc-relay-members${isRelayExpanded ? ' open' : ''}">
-          <div class="rc-relay-title">Integrantes del relevo</div>
-          <div class="rc-relay-list">
-            ${row.integrantes.map((item) => `
-              <div class="rc-relay-member">
-                <span class="rc-relay-member-name">${item.nombre}</span>
-                <span class="rc-relay-member-meta">${item.genero || row.genero} · ${item.edad} años</span>
-              </div>
-            `).join('')}
-          </div>
-        </div>
-      `
-      : '';
-    card.className = `result-card ${row.dq ? 'is-dq' : row.ns ? 'is-ns' : ''}`;
-    card.innerHTML = `
-      <div class="rc-pos ${posClass}">${posLabel}</div>
-      <div class="rc-body">
-        <div class="rc-name">${row.relay ? row.nombre : getAthleteAction(row.nombre)}${statusTag(row)}</div>
-        <div class="rc-meta">
-          ${relayToggle} · Evento ${row.evento} · ${row.prueba} · ${getDisplayCategoryForRow(row)}
-        </div>
-        <div class="rc-submeta">${getResultSecondaryMeta(row)}</div>
-        ${relayMembers}
-      </div>
-      <div class="rc-right">
-        <span class="rc-time">${row.displayTime}</span>
-        ${recordBadge ? `<span class="rc-record-pill ${recordBadge.toLowerCase()}">${recordBadge}</span>` : ''}
-        <span class="rc-points">${row.puntos} pts</span>
-      </div>
-    `;
-    const relayToggleBtn = card.querySelector('[data-relay-toggle]');
-    if (relayToggleBtn) {
-      relayToggleBtn.addEventListener('click', (event) => {
-        event.stopPropagation();
-        const key = relayToggleBtn.dataset.relayToggle;
-        if (expandedRelayResults.has(key)) expandedRelayResults.delete(key);
-        else expandedRelayResults.add(key);
-        renderResults();
-      });
-    }
-    list.appendChild(card);
+  const grouped = new Map();
+  filtered.forEach((row) => {
+    const key = `${row.evento}|${row.prueba}|${row.categoria}|${row.genero}`;
+    if (!grouped.has(key)) grouped.set(key, []);
+    grouped.get(key).push(row);
   });
 
-  renderPagination(filtered.length);
-}
+  [...grouped.values()]
+    .sort((a, b) => (
+      a[0].evento - b[0].evento
+      || getCategorySortRank(a[0].categoria) - getCategorySortRank(b[0].categoria)
+      || a[0].categoria.localeCompare(b[0].categoria, 'es')
+      || a[0].genero.localeCompare(b[0].genero, 'es')
+    ))
+    .forEach((rows) => {
+      const first = rows[0];
+      const orderedRows = [...rows].sort((a, b) => (
+        (a.pos || 999) - (b.pos || 999)
+        || timeToSec(a.tiempo) - timeToSec(b.tiempo)
+        || a.nombre.localeCompare(b.nombre, 'es')
+      ));
+      const card = document.createElement('section');
+      card.className = 'result-event-card';
 
+      const rowItems = orderedRows.map((row) => {
+        let posClass = 'other';
+        let posLabel = row.pos ?? '—';
+
+        if (row.ns) {
+          posClass = 'dq-pos';
+          posLabel = 'NS';
+        } else if (row.nt) {
+          posClass = 'dq-pos';
+          posLabel = 'NT';
+        } else if (row.dq) {
+          posClass = 'dq-pos';
+          posLabel = 'DQ';
+        } else if (row.pos === 1) posClass = 'gold';
+        else if (row.pos === 2) posClass = 'silver';
+        else if (row.pos === 3) posClass = 'bronze';
+
+        const recordBadge = getRecordBadge(row);
+        return `
+          <div class="result-event-row ${row.dq ? 'is-dq' : row.ns ? 'is-ns' : ''}">
+            <div class="rc-pos ${posClass}">${posLabel}</div>
+            <div class="result-event-athlete">
+              <div class="rc-name">${row.relay ? row.nombre : getAthleteAction(row.nombre)}${statusTag(row)}</div>
+              <div class="rc-submeta">${row.turno || row.sesionNombre}</div>
+            </div>
+            <div class="result-event-marks">
+              <span class="rc-time${recordBadge ? ' record-time' : ''}">${row.displayTime}</span>
+              ${recordBadge ? `<span class="rc-record-pill ${recordBadge.toLowerCase()}">${recordBadge}</span>` : ''}
+              <span class="rc-points">${row.puntos} pts</span>
+            </div>
+          </div>
+        `;
+      }).join('');
+
+      card.innerHTML = `
+        <div class="result-event-head">
+          <div>
+            <div class="podio-header-title">Evento ${first.evento} · ${first.prueba}</div>
+            <div class="podio-header-sub">${first.categoria} · ${first.genero}</div>
+          </div>
+          <span class="result-event-count">${orderedRows.length} nadador${orderedRows.length !== 1 ? 'es' : ''}</span>
+        </div>
+        <div class="result-event-rows">${rowItems}</div>
+      `;
+      list.appendChild(card);
+    });
+}
 function updateResultsInfo() {
   const hasFilters = [activeSesion, activeGenero, activePrueba, activeCategoria, activeEquipo, activeBuscar].filter(Boolean).length > 0;
   document.getElementById('tableInfo').textContent = `${filtered.length} resultado${filtered.length !== 1 ? 's' : ''}`;
@@ -737,6 +745,7 @@ function buildAthleteRankingData(rows, options = {}) {
   const officialUntilEvent = RECORDS.validacion?.officialUntilEvent || RECORDS.meta.eventos;
   const scope = options.scope || 'categories';
   const session = options.session || 'all';
+  const category = options.category || 'all';
   const buckets = {
     combined: new Map(),
     women: new Map(),
@@ -759,6 +768,7 @@ function buildAthleteRankingData(rows, options = {}) {
       row.evento <= officialUntilEvent
       && (scope === 'absolute' ? row.categoria === 'Absoluto' : row.categoria !== 'Absoluto')
       && (session === 'all' || row.sesionNombre === session)
+      && (scope === 'absolute' || category === 'all' || row.categoria === category)
       && !row.relay
       && Number(row.puntosOficiales || row.puntos || 0) > 0
       && !row.exhibition
@@ -800,7 +810,8 @@ function syncRankingView(processedRows = allData.length) {
   rankingViews = {
     athlete: buildAthleteRankingData(allData, {
       scope: activeRankingScope,
-      session: activeRankingSession
+      session: activeRankingSession,
+      category: activeRankingCategory
     })
   };
 
@@ -1970,11 +1981,15 @@ function initRankingSwitch() {
 function initRankingFilterControls(data) {
   const tournamentButtons = document.querySelectorAll('[data-ranking-scope]');
   const sessionSwitch = document.getElementById('rankingSessionSwitch');
+  const categorySwitch = document.getElementById('rankingCategorySwitch');
+  const categoryFilterGroup = document.getElementById('rankingCategoryFilterGroup');
   const sessions = [...new Map(
     [...data]
       .sort((a, b) => a.sesion - b.sesion || a.evento - b.evento)
       .map((row) => [row.sesionNombre, row.sesion])
   ).entries()];
+  const categories = [...new Set(data.filter((row) => row.categoria !== 'Absoluto').map((row) => row.categoria))]
+    .sort((a, b) => a.localeCompare(b, 'es'));
 
   if (sessionSwitch) {
     sessionSwitch.innerHTML = [
@@ -1991,10 +2006,28 @@ function initRankingFilterControls(data) {
     `).join('');
   }
 
+  if (categorySwitch) {
+    categorySwitch.innerHTML = [
+      { label: 'Todas', value: 'all' },
+      ...categories.map((category) => ({ label: category, value: category }))
+    ].map((category, index) => `
+      <button
+        class="ranking-switch-btn ranking-category-btn${index === 0 ? ' active' : ''}"
+        data-ranking-category="${category.value}"
+        type="button"
+      >
+        ${category.label}
+      </button>
+    `).join('');
+  }
+
   tournamentButtons.forEach((button) => {
     button.addEventListener('click', () => {
       activeRankingScope = button.dataset.rankingScope;
+      if (activeRankingScope === 'absolute') activeRankingCategory = 'all';
       tournamentButtons.forEach((node) => node.classList.toggle('active', node === button));
+      categoryFilterGroup?.classList.toggle('is-disabled', activeRankingScope === 'absolute');
+      document.querySelectorAll('[data-ranking-category]').forEach((node) => node.classList.toggle('active', node.dataset.rankingCategory === activeRankingCategory));
       syncRankingView();
     });
   });
@@ -2003,6 +2036,14 @@ function initRankingFilterControls(data) {
     button.addEventListener('click', () => {
       activeRankingSession = button.dataset.rankingSession;
       document.querySelectorAll('[data-ranking-session]').forEach((node) => node.classList.toggle('active', node === button));
+      syncRankingView();
+    });
+  });
+
+  document.querySelectorAll('[data-ranking-category]').forEach((button) => {
+    button.addEventListener('click', () => {
+      activeRankingCategory = button.dataset.rankingCategory;
+      document.querySelectorAll('[data-ranking-category]').forEach((node) => node.classList.toggle('active', node === button));
       syncRankingView();
     });
   });

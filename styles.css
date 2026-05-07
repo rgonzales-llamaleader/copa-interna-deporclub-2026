@@ -536,7 +536,77 @@ body {
 /* ═══════════════════════════════════════
    RESULT CARDS
 ═══════════════════════════════════════ */
-.results-list { display: flex; flex-direction: column; gap: .6rem; }
+.results-list {
+  display: grid;
+  gap: .85rem;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+}
+
+.result-event-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  box-shadow: 0 1px 6px rgba(0,0,0,.07);
+  overflow: hidden;
+}
+
+.result-event-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: .75rem;
+  padding: .85rem 1rem;
+  background: linear-gradient(135deg, var(--navy), var(--blue));
+  color: #fff;
+}
+
+.result-event-head .podio-header-title,
+.result-event-head .podio-header-sub {
+  color: #fff;
+}
+
+.result-event-count {
+  flex-shrink: 0;
+  font-size: .68rem;
+  font-weight: 800;
+  padding: .2rem .45rem;
+  border-radius: 999px;
+  background: rgba(255,255,255,.16);
+}
+
+.result-event-rows {
+  display: grid;
+}
+
+.result-event-row {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: .65rem;
+  align-items: center;
+  padding: .75rem .85rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.result-event-row:last-child {
+  border-bottom: none;
+}
+
+.result-event-row.is-dq,
+.result-event-row.is-ns {
+  opacity: .55;
+}
+
+.result-event-athlete {
+  min-width: 0;
+}
+
+.result-event-marks {
+  display: grid;
+  justify-items: end;
+  gap: .15rem;
+  text-align: right;
+  min-width: 64px;
+}
 
 .result-card {
   background: var(--surface);
@@ -1684,6 +1754,11 @@ footer a {
 
 .ranking-filter-group {
   margin-bottom: .7rem;
+}
+
+.ranking-filter-group.is-disabled {
+  opacity: .45;
+  pointer-events: none;
 }
 
 .ranking-filter-switch {
