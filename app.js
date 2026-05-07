@@ -102,6 +102,48 @@ function getDisplayCategoryForRow(row) {
   return matchingSameRace?.categoria || getPrimaryCategory(matchingRows) || row.categoria;
 }
 
+function getSwimKey(row) {
+  return [
+    normalizeAthleteName(row.nombre),
+    row.sesionNombre,
+    row.genero,
+    row.prueba,
+    row.tiempo
+  ].join('|');
+}
+
+function findLinkedScoreRow(row, category) {
+  const key = getSwimKey(row);
+  return allData.find((item) => (
+    !item.relay
+    && item.categoria === category
+    && getSwimKey(item) === key
+  ));
+}
+
+function getCategoryScoreRow(row) {
+  return isRealCategory(row.categoria) ? row : findLinkedScoreRow(row, getDisplayCategoryForRow(row));
+}
+
+function getAbsoluteScoreRow(row) {
+  return row.categoria === 'Absoluto' ? row : findLinkedScoreRow(row, 'Absoluto');
+}
+
+function getPhysicalResultRows(rows) {
+  const bySwim = new Map();
+  rows
+    .filter((row) => !row.relay)
+    .forEach((row) => {
+      const key = getSwimKey(row);
+      const current = bySwim.get(key);
+      if (!current || (current.categoria === 'Absoluto' && isRealCategory(row.categoria))) {
+        bySwim.set(key, row);
+      }
+    });
+
+  return [...bySwim.values()];
+}
+
 const isDesktop = () => window.innerWidth >= 768;
 
 function syncBodyScrollLock() {
@@ -266,14 +308,21 @@ function initTabs() {
 
 function openSheet() {
   document.getElementById('filterSheet').classList.add('open');
-  document.getElementById('sheetBackdrop').classList.add('open');
+  document.getElementById('filterToggleBtn')?.classList.add('is-open');
+  if (!isDesktop()) document.getElementById('sheetBackdrop').classList.add('open');
   syncBodyScrollLock();
 }
 
 function closeSheet() {
   document.getElementById('filterSheet').classList.remove('open');
+  document.getElementById('filterToggleBtn')?.classList.remove('is-open');
   document.getElementById('sheetBackdrop').classList.remove('open');
   syncBodyScrollLock();
+}
+
+function toggleSheet() {
+  if (document.getElementById('filterSheet').classList.contains('open')) closeSheet();
+  else openSheet();
 }
 
 function getPromoPopupLastShownAt() {
@@ -343,7 +392,7 @@ function syncActiveFiltersFromUI() {
 
 function applySheetFilters() {
   syncActiveFiltersFromUI();
-  if (!isDesktop()) closeSheet();
+  closeSheet();
   applyFilters();
   updateFilterBtn();
 }
@@ -357,7 +406,7 @@ function clearSheetFilters() {
   activePrueba = '';
   activeCategoria = '';
   activeEquipo = '';
-  if (!isDesktop()) closeSheet();
+  closeSheet();
   applyFilters();
   updateFilterBtn();
 }
@@ -575,7 +624,8 @@ function renderResults() {
   }
 
   const grouped = new Map();
-  filtered.forEach((row) => {
+  const displayRows = getPhysicalResultRows(filtered);
+  displayRows.forEach((row) => {
     const key = `${row.evento}|${row.prueba}|${row.categoria}|${row.genero}`;
     if (!grouped.has(key)) grouped.set(key, []);
     grouped.get(key).push(row);
@@ -616,6 +666,12 @@ function renderResults() {
         else if (row.pos === 3) posClass = 'bronze';
 
         const recordBadge = getRecordBadge(row);
+        const categoryScore = getCategoryScoreRow(row);
+        const absoluteScore = getAbsoluteScoreRow(row);
+        const scoreLabels = [
+          categoryScore ? `<span class="rc-points">Cat ${cleanPoints(categoryScore.puntos)} pts</span>` : '',
+          absoluteScore ? `<span class="rc-points rc-points-absolute">Abs ${cleanPoints(absoluteScore.puntos)} pts</span>` : ''
+        ].filter(Boolean).join('');
         return `
           <div class="result-event-row ${row.dq ? 'is-dq' : row.ns ? 'is-ns' : ''}">
             <div class="rc-pos ${posClass}">${posLabel}</div>
@@ -626,7 +682,7 @@ function renderResults() {
             <div class="result-event-marks">
               <span class="rc-time${recordBadge ? ' record-time' : ''}">${row.displayTime}</span>
               ${recordBadge ? `<span class="rc-record-pill ${recordBadge.toLowerCase()}">${recordBadge}</span>` : ''}
-              <span class="rc-points">${row.puntos} pts</span>
+              ${scoreLabels}
             </div>
           </div>
         `;
@@ -967,7 +1023,7 @@ function buildIndividualAnalysisData(rows) {
         teamName: row.categoria,
         genero: row.genero,
         points: 0,
-        events: 0,
+        swims: new Set(),
         tests: new Set(),
         firstPoints: 0,
         fifthPoints: 0,
@@ -981,7 +1037,7 @@ function buildIndividualAnalysisData(rows) {
     }
     const points = Number(row.puntosOficiales || row.puntos || 0);
     athlete.points += points;
-    athlete.events += 1;
+    athlete.swims.add(getSwimKey(row));
     athlete.tests.add(row.prueba);
     athlete.sessions.set(row.sesionNombre, (athlete.sessions.get(row.sesionNombre) || 0) + points);
 
@@ -1033,8 +1089,9 @@ function buildIndividualAnalysisData(rows) {
 
   const entries = [...athletes.values()].map((athlete) => ({
     ...athlete,
+    events: athlete.swims.size,
     points: Number(cleanPoints(athlete.points)),
-    pointsPerEvent: Number(cleanPoints(athlete.events ? athlete.points / athlete.events : 0)),
+    pointsPerEvent: Number(cleanPoints(athlete.swims.size ? athlete.points / athlete.swims.size : 0)),
     testsCount: athlete.tests.size,
     firstPoints: Number(cleanPoints(athlete.firstPoints)),
     fifthPoints: Number(cleanPoints(athlete.fifthPoints)),
@@ -1159,6 +1216,7 @@ function getAthleteRows(name) {
 function openAthleteDetail(name) {
   const rows = getAthleteRows(name);
   const individualRows = rows.filter((row) => !row.relay);
+  const physicalIndividualRows = getPhysicalResultRows(individualRows);
   if (!rows.length) return;
 
   const validIndividualRows = individualRows.filter((row) => !row.dq && !row.ns && !row.nt && !row.exhibition);
@@ -1186,8 +1244,8 @@ function openAthleteDetail(name) {
     </article>
     <article class="metric-card">
       <span class="metric-label">Pruebas</span>
-      <strong class="metric-value">${individualRows.length}</strong>
-      <span class="metric-copy">${new Set(individualRows.map((row) => row.prueba)).size} pruebas distintas.</span>
+      <strong class="metric-value">${physicalIndividualRows.length}</strong>
+      <span class="metric-copy">${new Set(physicalIndividualRows.map((row) => row.prueba)).size} pruebas distintas nadadas.</span>
     </article>
     <article class="metric-card">
       <span class="metric-label">Medallas</span>
@@ -1200,9 +1258,16 @@ function openAthleteDetail(name) {
       <span class="metric-copy">${bestTimeRow ? `${bestTimeRow.prueba} · ${bestTimeRow.sesionNombre}` : 'Sin tiempos validos.'}</span>
     </article>
   `;
-  document.getElementById('athleteDetailResults').innerHTML = rows
+  document.getElementById('athleteDetailResults').innerHTML = physicalIndividualRows
     .sort((a, b) => a.sesion - b.sesion || a.evento - b.evento)
-    .map((row) => `
+    .map((row) => {
+      const categoryScore = getCategoryScoreRow(row);
+      const absoluteScore = getAbsoluteScoreRow(row);
+      const scoreLabel = [
+        categoryScore ? `Cat ${cleanPoints(categoryScore.puntos)} pts` : '',
+        absoluteScore ? `Abs ${cleanPoints(absoluteScore.puntos)} pts` : ''
+      ].filter(Boolean).join(' · ');
+      return `
       <div class="ranking-row metrics-row">
         <div class="rk-pos">${row.pos || (row.dq ? 'DQ' : row.ns ? 'NS' : row.nt ? 'NT' : '-')}</div>
         <div class="rk-body">
@@ -1211,10 +1276,11 @@ function openAthleteDetail(name) {
         </div>
         <div class="rk-points">
           <span class="rk-pts">${row.displayTime}</span>
-          <span class="rk-pts-label">${row.puntos} pts</span>
+          <span class="rk-pts-label">${scoreLabel}</span>
         </div>
       </div>
-    `).join('');
+    `;
+    }).join('');
 
   document.getElementById('athleteDetailBackdrop').classList.add('open');
   document.getElementById('athleteDetailModal').classList.add('open');
@@ -2181,7 +2247,7 @@ function init() {
   });
 
   document.getElementById('filterToggleBtn').addEventListener('click', () => {
-    if (!isDesktop()) openSheet();
+    toggleSheet();
   });
 
   document.getElementById('medalBuscar').addEventListener('input', (event) => {
@@ -2212,7 +2278,11 @@ function init() {
 
   ['filterSesion', 'filterGenero', 'filterPrueba', 'filterCategoria', 'filterEquipo'].forEach((id) => {
     document.getElementById(id).addEventListener('change', () => {
-      if (isDesktop()) applySheetFilters();
+      if (isDesktop()) {
+        syncActiveFiltersFromUI();
+        applyFilters();
+        updateFilterBtn();
+      }
     });
   });
 

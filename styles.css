@@ -499,6 +499,11 @@ body {
   color: #fff;
 }
 
+.filter-toggle-btn.is-open {
+  border-color: var(--blue);
+  box-shadow: 0 8px 18px rgba(126, 34, 206, .12);
+}
+
 .filter-badge {
   background: #fff;
   color: var(--blue);
@@ -1608,30 +1613,55 @@ footer a {
 
   .filter-sheet {
     position: static;
+    display: none;
     transform: none !important;
     border-radius: var(--radius);
-    padding: 1.25rem;
-    margin-bottom: 1.25rem;
+    padding: .9rem;
+    margin: -.35rem 0 1rem;
     box-shadow: 0 2px 12px rgba(0,0,0,.08);
+    max-height: none;
+    overflow: visible;
+  }
+
+  .filter-sheet.open {
+    display: grid;
+    grid-template-columns: repeat(5, minmax(120px, 1fr)) auto;
+    align-items: end;
+    gap: .75rem;
   }
 
   .sheet-handle,
   .sheet-close { display: none; }
 
   .sheet-title {
-    font-size: .9rem;
-    font-weight: 700;
-    color: var(--muted);
-    text-transform: uppercase;
-    letter-spacing: .05em;
-    margin-bottom: 1rem;
+    display: none;
+  }
+
+  .sheet-field {
+    margin-bottom: 0;
+  }
+
+  .sheet-field label {
+    font-size: .66rem;
+    margin-bottom: .25rem;
+  }
+
+  .sheet-field select {
+    padding: .62rem 2rem .62rem .7rem;
+    font-size: .82rem;
   }
 
   .sheet-actions {
-    grid-template-columns: auto auto;
+    display: flex;
+    gap: .5rem;
+    margin-top: 0;
     justify-content: flex-end;
   }
-  .btn-clear, .btn-apply { padding: .6rem 1.25rem; font-size: .85rem; }
+  .btn-clear, .btn-apply {
+    padding: .62rem .8rem;
+    font-size: .8rem;
+    white-space: nowrap;
+  }
 
   .sheet-backdrop { display: none !important; }
 
@@ -1671,6 +1701,11 @@ footer a {
   color: var(--blue);
   font-size: .72rem;
   font-weight: 800;
+}
+
+.rc-points-absolute {
+  background: rgba(59, 7, 100, .1);
+  color: var(--navy);
 }
 
 .badge-ns,
