@@ -1,5 +1,11 @@
 'use strict';
 
+const RECORDS = window.DEPORCLUB_RECORDS || window.RECORDS || {
+  meta: {},
+  validacion: {},
+  resultados: []
+};
+
 const DEFAULT_SWIM_RECORDS = {
   Damas: {
     '400 LC Metros Libre': { RM: '3:54.18', RN: '4:17.21' },
@@ -1326,7 +1332,7 @@ function buildOfficialTeamMetricData(rows) {
     && !row.nt
     && row.teamName !== 'Unattached'
   ));
-  const rankedTeams = RECORDS.rankingsOficiales.combined.map((item) => item.teamName);
+  const rankedTeams = RECORDS.rankingsOficiales?.combined?.map((item) => item.teamName) || [];
   const extraTeams = [...new Set(scoringRows.map((row) => row.teamName))]
     .filter((teamName) => !rankedTeams.includes(teamName));
   const topTeams = [...rankedTeams, ...extraTeams];
