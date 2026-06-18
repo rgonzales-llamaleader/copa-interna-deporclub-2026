@@ -6,7 +6,7 @@
   <meta name="theme-color" content="#3b0764" />
   <link rel="icon" type="image/png" href="logo llama leads isotipo.png" />
   <title>Torneo Interno Deporclub 2026</title>
-  <link rel="stylesheet" href="styles.css" />
+  <link rel="stylesheet" href="styles.css?v=20260617-podiumstyle" />
   <script type="text/javascript">
     (function(c,l,a,r,i,t,y){
         c[a]=c[a]||function(){(c[a].q=c[a].q||[]).push(arguments)};
@@ -19,7 +19,7 @@
 <header class="header">
   <div class="header-logo">🏊</div>
   <h1>Torneo Interno<br>Deporclub 2026</h1>
-  <p class="header-sub" id="headerSub">Apertura 2026 · 2 Fechas disputadas</p>
+  <p class="header-sub" id="headerSub">Apertura 2026 · 3 Fechas disputadas</p>
   <a
     class="header-powered"
     href="https://llamaleads.pro/landing-copa-deporclub-2026"
@@ -45,6 +45,14 @@
     <div class="stat-label">Eventos</div>
   </div>
 </div>
+
+<section class="secret-game" id="secretGame">
+  <div class="secret-game-head">
+    <span class="secret-game-kicker">Juego de datos</span>
+    <strong>Revela las cartas del torneo</strong>
+  </div>
+  <div class="secret-card-grid" id="secretCardGrid"></div>
+</section>
 
 <nav class="tabs">
   <button class="tab-btn active" data-tab="podios">
@@ -89,25 +97,30 @@
   <div class="ranking-header">
     <p class="ranking-subtitle" id="rankingSubtitle">Acumulado oficial vigente hasta el Evento 77</p>
   </div>
-  <div class="ranking-filter-group">
-    <div class="pills-label">Torneo</div>
-    <div class="ranking-switch ranking-filter-switch" id="rankingTournamentSwitch">
-      <button class="ranking-switch-btn active" data-ranking-scope="categories" type="button">Categorias</button>
-      <button class="ranking-switch-btn" data-ranking-scope="absolute" type="button">Absoluto</button>
+  <div class="ranking-filter-board">
+    <div class="ranking-filter-group">
+      <div class="pills-label">🏁 Torneo</div>
+      <div class="ranking-switch ranking-filter-switch" id="rankingTournamentSwitch">
+        <button class="ranking-switch-btn active" data-ranking-scope="categories" type="button">Categorias</button>
+        <button class="ranking-switch-btn" data-ranking-scope="absolute" type="button">Absoluto</button>
+      </div>
     </div>
-  </div>
-  <div class="ranking-filter-group">
-    <div class="pills-label">Fecha</div>
-    <div class="ranking-switch ranking-filter-switch" id="rankingSessionSwitch"></div>
-  </div>
-  <div class="ranking-filter-group" id="rankingCategoryFilterGroup">
-    <div class="pills-label">Categoria</div>
-    <div class="ranking-switch ranking-filter-switch" id="rankingCategorySwitch"></div>
-  </div>
-  <div class="ranking-switch" id="rankingSwitch">
-    <button class="ranking-switch-btn active" data-ranking-target="combined">General</button>
-    <button class="ranking-switch-btn" data-ranking-target="women">Mujeres</button>
-    <button class="ranking-switch-btn" data-ranking-target="men">Hombres</button>
+    <div class="ranking-filter-group">
+      <div class="pills-label">📅 Fecha</div>
+      <div class="ranking-switch ranking-filter-switch" id="rankingSessionSwitch"></div>
+    </div>
+    <div class="ranking-filter-group" id="rankingCategoryFilterGroup">
+      <div class="pills-label">🏊 Categoria</div>
+      <div class="ranking-switch ranking-filter-switch" id="rankingCategorySwitch"></div>
+    </div>
+    <div class="ranking-filter-group">
+      <div class="pills-label">🎯 Rama</div>
+      <div class="ranking-switch ranking-filter-switch" id="rankingSwitch">
+        <button class="ranking-switch-btn active" data-ranking-target="combined">General</button>
+        <button class="ranking-switch-btn" data-ranking-target="women">Mujeres</button>
+        <button class="ranking-switch-btn" data-ranking-target="men">Hombres</button>
+      </div>
+    </div>
   </div>
   <div class="ranking-sections">
     <section class="ranking-block active" data-ranking-panel="combined">
@@ -154,7 +167,14 @@
     <p class="ranking-subtitle">Rendimiento individual acumulado por nadador</p>
   </div>
   <div class="metrics-note metrics-click-note">
-    En esta vista se suma el puntaje individual de categorias y absoluto. Haz click sobre cualquier nombre de nadador para abrir su ficha con datos y resultados completos.
+    Elige si quieres analizar el torneo por categorias o el torneo absoluto. Haz click sobre cualquier nombre de nadador para abrir su ficha con datos y resultados completos.
+  </div>
+  <div class="ranking-filter-group individual-scope-filter">
+    <div class="pills-label">Torneo</div>
+    <div class="ranking-switch ranking-filter-switch" id="individualScopeSwitch">
+      <button class="ranking-switch-btn active" data-individual-scope="categories" type="button">Categorias</button>
+      <button class="ranking-switch-btn" data-individual-scope="absolute" type="button">Absoluto</button>
+    </div>
   </div>
   <div class="metrics-grid" id="individualSummary"></div>
   <div class="metrics-note" id="individualNote"></div>
@@ -367,7 +387,7 @@
   </div>
 </div>
 
-<script src="data.js?v=20260603-f2"></script>
-<script src="app.js?v=20260603-f2"></script>
+<script src="data.js?v=20260617-podiumstyle"></script>
+<script src="app.js?v=20260617-podiumstyle"></script>
 </body>
 </html>
