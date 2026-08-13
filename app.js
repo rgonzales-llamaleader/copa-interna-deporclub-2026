@@ -296,7 +296,7 @@ function renderStyleChips(styles, extraClass = '') {
   return `
     <div class="event-meta-chips ${extraClass}">
       ${summary.map((entry) => `
-        <span class="event-chip event-chip-style">${getStyleIcon(entry.style)} ${entry.style}</span>
+        <span class="event-chip event-chip-style ${getStyleClass(entry.style)}-chip">${getStyleIcon(entry.style)} ${entry.style}</span>
       `).join('')}
     </div>
   `;
