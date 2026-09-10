@@ -1474,7 +1474,7 @@ function renderIndividualAnalysis(rows) {
     <article class="metric-card">
       <span class="metric-label">Pruebas tomadas</span>
       <strong class="metric-value">${analysis.summary.totalEvents}</strong>
-      <span class="metric-copy">Salidas individuales puntuables acumuladas en las 5 fechas.</span>
+      <span class="metric-copy">Salidas individuales puntuables acumuladas en las ${RECORDS.meta.sesiones} fechas.</span>
     </article>
     <article class="metric-card">
       <span class="metric-label">Mayor puntaje</span>
